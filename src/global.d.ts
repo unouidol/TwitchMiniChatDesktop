@@ -1,23 +1,15 @@
-﻿/**
+﻿import type { TmcPreloadApi } from './preload/tmcPreloadApi';
+
+/**
  * Global renderer declarations for the secure TMC preload bridge.
  */
 export {};
 
 declare global {
   interface Window {
-    readonly tmc: {
-      /**
-       * Returns basic application information.
-       */
-      readonly getAppInfo: () => {
-        readonly appName: string;
-        readonly platform: NodeJS.Platform;
-      };
-
-      /**
-       * Sends a diagnostic ping to the Electron main process.
-       */
-      readonly ping: () => Promise<string>;
-    };
+    /**
+     * Safe TMC API exposed by Electron preload.
+     */
+    readonly tmc: TmcPreloadApi;
   }
 }
