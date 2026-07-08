@@ -1,6 +1,22 @@
 ﻿import { contextBridge, ipcRenderer } from 'electron';
 import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
+import type {
+  LoadHistoryRequest,
+  LoadHistoryResult,
+} from '../shared/backend/TmcHistoryModels';
 import { TMC_IPC_CHANNELS } from '../shared/ipc/IpcChannels';
+
+/**
+ * Backend API exposed to the local renderer through the safe preload bridge.
+ */
+export type TmcBackendPreloadApi = {
+  /**
+   * Loads cached chat history through the Electron main process.
+   */
+  readonly loadHistory: (
+    request: LoadHistoryRequest,
+  ) => Promise<LoadHistoryResult>;
+};
 
 /**
  * Safe API exposed to the local renderer.
@@ -19,6 +35,11 @@ export type TmcPreloadApi = {
    * Sends a diagnostic ping to the Electron main process.
    */
   readonly ping: () => Promise<string>;
+
+  /**
+   * Backend operations available to the local UI.
+   */
+  readonly backend: TmcBackendPreloadApi;
 };
 
 /**
@@ -33,6 +54,14 @@ function createTmcPreloadApi(): TmcPreloadApi {
 
     ping: async (): Promise<string> => {
       return ipcRenderer.invoke(TMC_IPC_CHANNELS.appPing);
+    },
+
+    backend: {
+      loadHistory: async (
+        request: LoadHistoryRequest,
+      ): Promise<LoadHistoryResult> => {
+        return ipcRenderer.invoke(TMC_IPC_CHANNELS.backendLoadHistory, request);
+      },
     },
   };
 }

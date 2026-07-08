@@ -24,8 +24,39 @@
       <section class="tmc-layout">
         <aside class="tmc-sidebar">
           <h2>Channels</h2>
-          <button type="button" class="tmc-channel-button">#unouidol</button>
-          <button type="button" class="tmc-channel-button">#lukankuro</button>
+
+          <label class="tmc-channel-form">
+            <span>Current channel</span>
+            <input
+              id="channelInput"
+              class="tmc-channel-input"
+              type="text"
+              value="unouidol"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+
+          <button id="loadHistoryButton" type="button" class="tmc-primary-button">
+            Load history
+          </button>
+
+          <div class="tmc-channel-shortcuts">
+            <button
+              type="button"
+              class="tmc-channel-button"
+              data-channel="unouidol"
+            >
+              #unouidol
+            </button>
+            <button
+              type="button"
+              class="tmc-channel-button"
+              data-channel="lukankuro"
+            >
+              #lukankuro
+            </button>
+          </div>
         </aside>
 
         <section class="tmc-chat">

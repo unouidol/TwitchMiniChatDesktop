@@ -9,6 +9,11 @@ export const TMC_IPC_CHANNELS = {
    * Diagnostic ping from the renderer to the main process.
    */
   appPing: 'tmc:app:ping',
+
+  /**
+   * Loads cached Twitch chat history from the TMC backend.
+   */
+  backendLoadHistory: 'tmc:backend:load-history',
 } as const;
 
 /**
