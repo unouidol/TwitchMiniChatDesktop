@@ -1,13 +1,59 @@
-<!doctype html>
-<html>
+﻿<!doctype html>
+<html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <title>Hello World!</title>
-
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'self';"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Twitch Mini Chat Desktop</title>
   </head>
+
   <body>
-    <h1>💖 Hello World!</h1>
-    <p>Welcome to your Electron application.</p>
+    <main class="tmc-shell">
+      <section class="tmc-header">
+        <div>
+          <h1>Twitch Mini Chat Desktop</h1>
+          <p id="appInfo">Loading app info...</p>
+        </div>
+
+        <button id="pingButton" type="button">Ping main process</button>
+      </section>
+
+      <section class="tmc-layout">
+        <aside class="tmc-sidebar">
+          <h2>Channels</h2>
+          <button type="button" class="tmc-channel-button">#unouidol</button>
+          <button type="button" class="tmc-channel-button">#lukankuro</button>
+        </aside>
+
+        <section class="tmc-chat">
+          <div class="tmc-chat-list" id="chatList">
+            <article class="tmc-message">
+              <strong>system</strong>
+              <span>TMC Desktop skeleton ready.</span>
+            </article>
+          </div>
+
+          <form class="tmc-composer" id="composerForm">
+            <input
+              id="messageInput"
+              type="text"
+              autocomplete="off"
+              placeholder="Write a manual chat command or message..."
+            />
+            <button type="submit">Send</button>
+          </form>
+        </section>
+
+        <aside class="tmc-pcg-panel">
+          <h2>PCG</h2>
+          <p>Probe panel placeholder.</p>
+        </aside>
+      </section>
+    </main>
+
     <script type="module" src="/src/renderer.ts"></script>
   </body>
 </html>

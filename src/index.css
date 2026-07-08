@@ -1,8 +1,140 @@
+﻿* {
+  box-sizing: border-box;
+}
+
 body {
+  margin: 0;
+  min-width: 900px;
+  min-height: 560px;
   font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  margin: auto;
-  max-width: 38rem;
-  padding: 2rem;
+    Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: #e5e7eb;
+  background: #111827;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #f9fafb;
+  background: #374151;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #4b5563;
+}
+
+.tmc-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.tmc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid #374151;
+  background: #1f2937;
+}
+
+.tmc-header h1 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.tmc-header p {
+  margin: 6px 0 0;
+  color: #9ca3af;
+}
+
+.tmc-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(360px, 1fr) 280px;
+  min-height: 0;
+  flex: 1;
+}
+
+.tmc-sidebar,
+.tmc-pcg-panel {
+  padding: 16px;
+  overflow: auto;
+  background: #111827;
+}
+
+.tmc-sidebar {
+  border-right: 1px solid #374151;
+}
+
+.tmc-pcg-panel {
+  border-left: 1px solid #374151;
+}
+
+.tmc-sidebar h2,
+.tmc-pcg-panel h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.tmc-channel-button {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.tmc-chat {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: #030712;
+}
+
+.tmc-chat-list {
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+  overflow: auto;
+}
+
+.tmc-message {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(55, 65, 81, 0.55);
+}
+
+.tmc-message strong {
+  color: #a78bfa;
+}
+
+.tmc-composer {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid #374151;
+  background: #111827;
+}
+
+.tmc-composer input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #f9fafb;
+  background: #030712;
+}
+
+.tmc-composer input:focus {
+  outline: 2px solid #7c3aed;
+  outline-offset: 1px;
 }
