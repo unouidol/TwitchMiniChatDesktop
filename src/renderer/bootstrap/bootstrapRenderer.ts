@@ -1,4 +1,5 @@
-﻿import { appendLocalMessage } from '../chat/appendLocalMessage';
+﻿import { renderRecentChannels } from '../channels/renderRecentChannels';
+import { appendLocalMessage } from '../chat/appendLocalMessage';
 import { renderHistoryMessages } from '../chat/renderHistoryMessages';
 
 /**
@@ -16,8 +17,6 @@ export async function bootstrapRenderer(): Promise<void> {
   const channelInput = document.querySelector<HTMLInputElement>('#channelInput');
   const loadHistoryButton =
     document.querySelector<HTMLButtonElement>('#loadHistoryButton');
-  const channelButtons =
-    document.querySelectorAll<HTMLButtonElement>('[data-channel]');
 
   const appInfo = window.tmc.getAppInfo();
 
@@ -25,19 +24,11 @@ export async function bootstrapRenderer(): Promise<void> {
     appInfoElement.textContent = `${appInfo.appName} running on ${appInfo.platform}`;
   }
 
+  await initializeSettings(channelInput);
+
   pingButton?.addEventListener('click', async () => {
     const result = await window.tmc.ping();
     appendLocalMessage('main', result);
-  });
-
-  channelButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const channel = button.dataset.channel;
-
-      if (channelInput && channel) {
-        channelInput.value = channel;
-      }
-    });
   });
 
   loadHistoryButton?.addEventListener('click', async () => {
@@ -47,8 +38,11 @@ export async function bootstrapRenderer(): Promise<void> {
     appendLocalMessage('system', `Loading history for #${channel}...`);
 
     try {
+      const settings = await window.tmc.settings.setCurrentChannel({ channel });
+      updateChannelUi(channelInput, settings.currentChannel, settings.recentChannels);
+
       const result = await window.tmc.backend.loadHistory({
-        channel,
+        channel: settings.currentChannel,
         seconds: 3600,
       });
 
@@ -82,6 +76,39 @@ export async function bootstrapRenderer(): Promise<void> {
     if (messageInput) {
       messageInput.value = '';
       messageInput.focus();
+    }
+  });
+}
+
+/**
+ * Loads settings and initializes the visible channel controls.
+ */
+async function initializeSettings(
+  channelInput: HTMLInputElement | null,
+): Promise<void> {
+  try {
+    const settings = await window.tmc.settings.get();
+    updateChannelUi(channelInput, settings.currentChannel, settings.recentChannels);
+  } catch (error) {
+    appendLocalMessage('error', getErrorMessage(error));
+  }
+}
+
+/**
+ * Updates the channel input and recent channel shortcuts.
+ */
+function updateChannelUi(
+  channelInput: HTMLInputElement | null,
+  currentChannel: string,
+  recentChannels: readonly string[],
+): void {
+  if (channelInput) {
+    channelInput.value = currentChannel;
+  }
+
+  renderRecentChannels(recentChannels, (channel) => {
+    if (channelInput) {
+      channelInput.value = channel;
     }
   });
 }

@@ -4,6 +4,10 @@ import type {
   LoadHistoryRequest,
   LoadHistoryResult,
 } from '../shared/backend/TmcHistoryModels';
+import type {
+  SetCurrentChannelRequest,
+  TmcDesktopSettings,
+} from '../shared/settings/TmcSettingsModels';
 import { TMC_IPC_CHANNELS } from '../shared/ipc/IpcChannels';
 
 /**
@@ -16,6 +20,23 @@ export type TmcBackendPreloadApi = {
   readonly loadHistory: (
     request: LoadHistoryRequest,
   ) => Promise<LoadHistoryResult>;
+};
+
+/**
+ * Settings API exposed to the local renderer through the safe preload bridge.
+ */
+export type TmcSettingsPreloadApi = {
+  /**
+   * Loads non-secret local desktop settings.
+   */
+  readonly get: () => Promise<TmcDesktopSettings>;
+
+  /**
+   * Updates the current channel in local desktop settings.
+   */
+  readonly setCurrentChannel: (
+    request: SetCurrentChannelRequest,
+  ) => Promise<TmcDesktopSettings>;
 };
 
 /**
@@ -40,6 +61,11 @@ export type TmcPreloadApi = {
    * Backend operations available to the local UI.
    */
   readonly backend: TmcBackendPreloadApi;
+
+  /**
+   * Settings operations available to the local UI.
+   */
+  readonly settings: TmcSettingsPreloadApi;
 };
 
 /**
@@ -61,6 +87,21 @@ function createTmcPreloadApi(): TmcPreloadApi {
         request: LoadHistoryRequest,
       ): Promise<LoadHistoryResult> => {
         return ipcRenderer.invoke(TMC_IPC_CHANNELS.backendLoadHistory, request);
+      },
+    },
+
+    settings: {
+      get: async (): Promise<TmcDesktopSettings> => {
+        return ipcRenderer.invoke(TMC_IPC_CHANNELS.settingsGet);
+      },
+
+      setCurrentChannel: async (
+        request: SetCurrentChannelRequest,
+      ): Promise<TmcDesktopSettings> => {
+        return ipcRenderer.invoke(
+          TMC_IPC_CHANNELS.settingsSetCurrentChannel,
+          request,
+        );
       },
     },
   };

@@ -14,6 +14,16 @@ export const TMC_IPC_CHANNELS = {
    * Loads cached Twitch chat history from the TMC backend.
    */
   backendLoadHistory: 'tmc:backend:load-history',
+
+  /**
+   * Loads non-secret local desktop settings.
+   */
+  settingsGet: 'tmc:settings:get',
+
+  /**
+   * Updates the current Twitch channel in local desktop settings.
+   */
+  settingsSetCurrentChannel: 'tmc:settings:set-current-channel',
 } as const;
 
 /**

@@ -1,6 +1,7 @@
 ﻿import { ipcMain } from 'electron';
 import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
 import { registerBackendIpcHandlers } from './registerBackendIpcHandlers';
+import { registerSettingsIpcHandlers } from './registerSettingsIpcHandlers';
 
 /**
  * Registers application-level Inter-Process Communication handlers.
@@ -14,5 +15,6 @@ export function registerIpcHandlers(): void {
     return 'pong';
   });
 
+  registerSettingsIpcHandlers();
   registerBackendIpcHandlers();
 }
