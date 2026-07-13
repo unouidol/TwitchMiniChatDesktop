@@ -1,6 +1,7 @@
 ﻿import { ipcMain } from 'electron';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import { TmcBackendClient } from '../backend/TmcBackendClient';
+import type { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
 import type { LoadHistoryRequest } from '../../shared/backend/TmcHistoryModels';
 import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
 
@@ -9,8 +10,9 @@ import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
  */
 export function registerBackendIpcHandlers(
   runtimeConfig: TmcRuntimeConfig,
+  authSessionStore: TmcAuthSessionStore,
 ): void {
-  const backendClient = new TmcBackendClient(runtimeConfig);
+  const backendClient = new TmcBackendClient(runtimeConfig, authSessionStore);
 
   ipcMain.handle(
     TMC_IPC_CHANNELS.backendLoadHistory,

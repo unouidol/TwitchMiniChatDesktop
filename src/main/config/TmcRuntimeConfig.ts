@@ -74,6 +74,12 @@ export type TmcRuntimeConfig = {
 const localProperties = readLocalPropertiesFromProjectRoot();
 
 /**
+ * Public backend URL used to start the Twitch OAuth flow when no runtime
+ * override is provided. This is not a secret.
+ */
+const DEFAULT_OAUTH_START_URL = 'https://api.ircminichat.party/oauth/start';
+
+/**
  * Reads a runtime value from local.properties first, then environment variables.
  *
  * Local properties mirror the Android development setup and avoid accidentally
@@ -167,10 +173,13 @@ export const TMC_RUNTIME_CONFIG: TmcRuntimeConfig = {
     'historySecretKey',
   ]),
 
-  oauthStartUrl: readConfigValue('TMC_OAUTH_START_URL', [
-    'TMC_OAUTH_START_URL',
-    'OAUTH_START_URL',
-  ]),
+  oauthStartUrl:
+    process.env.TMC_OAUTH_START_URL?.trim() ||
+    readConfigValue('TMC_OAUTH_START_URL', [
+      'TMC_OAUTH_START_URL',
+      'OAUTH_START_URL',
+    ]) ||
+    DEFAULT_OAUTH_START_URL,
 
   oauthFinalizeUrl:
     readConfigValue('TMC_OAUTH_FINALIZE_URL', [

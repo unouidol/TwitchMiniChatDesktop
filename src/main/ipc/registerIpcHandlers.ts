@@ -82,7 +82,7 @@ export async function registerIpcHandlers(
     accountChannelStore,
   });
   registerSettingsIpcHandlers(runtimeConfig);
-  registerBackendIpcHandlers(runtimeConfig);
+  registerBackendIpcHandlers(runtimeConfig, authSessionStore);
 }
 
 async function restoreSavedDesktopSessions(

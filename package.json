@@ -1,7 +1,7 @@
 {
   "name": "twitchminichatdesktop",
   "productName": "twitchminichatdesktop",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "My Electron application description",
   "main": ".vite/build/main.js",
   "private": true,
@@ -39,5 +39,9 @@
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1"
+  },
+  "allowScripts": {
+    "electron-winstaller@5.4.4": true,
+    "esbuild@0.21.5": true
   }
 }

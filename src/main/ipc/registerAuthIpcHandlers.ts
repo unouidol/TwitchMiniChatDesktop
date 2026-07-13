@@ -5,8 +5,10 @@ import type {
   StartTwitchLoginRequest,
 } from '../../shared/auth/TmcAuthModels';
 import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
+import type { TmcAccountSessionRegistry } from '../accounts/TmcAccountSessionRegistry';
 import { TmcAuthBrokerClient } from '../auth/TmcAuthBrokerClient';
-import { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
+import type { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
+import type { TmcSecureAuthSessionStore } from '../auth/TmcSecureAuthSessionStore';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 
 /**
@@ -14,10 +16,13 @@ import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
  */
 export function registerAuthIpcHandlers(
   runtimeConfig: TmcRuntimeConfig,
+  authSessionStore: TmcAuthSessionStore,
+  accountRegistry: TmcAccountSessionRegistry,
+  secureAuthSessionStore: TmcSecureAuthSessionStore,
 ): void {
   const authBrokerClient = new TmcAuthBrokerClient(
     runtimeConfig,
-    new TmcAuthSessionStore(),
+    authSessionStore,
   );
 
   ipcMain.handle(TMC_IPC_CHANNELS.AUTH_GET_STATUS, async () => {
@@ -45,7 +50,17 @@ export function registerAuthIpcHandlers(
     ) => {
       const loginToken = readLoginTokenFromFinalizeRequest(request);
 
-      return authBrokerClient.finalizeLoginToken(loginToken);
+      const result = await authBrokerClient.finalizeLoginToken(loginToken);
+      const session = authSessionStore.getSession();
+
+      if (!session?.desktopSessionToken) {
+        throw new Error('Desktop session unavailable. Please sign in again.');
+      }
+
+      await secureAuthSessionStore.saveSession(session);
+      await accountRegistry.addOrUpdateSession(session);
+
+      return result;
     },
   );
 }

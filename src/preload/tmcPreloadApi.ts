@@ -1,4 +1,4 @@
-import {
+﻿import {
   contextBridge,
   ipcRenderer,
   type IpcRendererEvent,

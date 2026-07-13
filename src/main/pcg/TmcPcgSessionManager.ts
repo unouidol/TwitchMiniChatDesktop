@@ -15,6 +15,7 @@ import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 
 const HIDDEN_BOUNDS: Rectangle = { x: 0, y: 0, width: 0, height: 0 };
 const TWITCH_LOGIN_URL = 'https://www.twitch.tv/login';
+const TWITCH_AUTH_COOKIE_NAME = 'auth-token';
 const TWITCH_HOST_SUFFIX = 'twitch.tv';
 const EXT_TWITCH_HOST_SUFFIX = 'ext-twitch.tv';
 const TWITCH_AUTH_HOSTS = new Set([
@@ -44,6 +45,7 @@ export class TmcPcgSessionManager {
   private currentBounds: Rectangle | null = null;
   private currentPartition: string | null = null;
   private authPopup: BrowserWindow | null = null;
+  private isClosingAuthenticatedPopup = false;
   private panelUrl: string | null = null;
   private readonly detachedWindows = new Map<string, BrowserWindow>();
   private detachedPanelWindow: BrowserWindow | null = null;
@@ -491,7 +493,7 @@ export class TmcPcgSessionManager {
       return;
     }
 
-    this.authPopup = new BrowserWindow(
+    const authPopup = new BrowserWindow(
       buildPcgChildWindowOptions(partition, ownerWindow || this.attachedWindow, {
         width: options.width || 560,
         height: options.height || 760,
@@ -500,16 +502,27 @@ export class TmcPcgSessionManager {
         title: options.title || 'PCG Twitch Sign-in',
       }),
     );
+    this.authPopup = authPopup;
     configurePcgWebContentsForChildWindow(
-      this.authPopup.webContents,
+      authPopup.webContents,
       partition,
-      this.authPopup,
+      authPopup,
       'auth popup',
     );
 
-    this.authPopup.on('closed', () => {
+    const checkAuthentication = (): void => {
+      void this.closeAuthPopupWhenAuthenticated(authPopup);
+    };
+
+    authPopup.webContents.on('did-navigate', checkAuthentication);
+    authPopup.webContents.on('did-finish-load', checkAuthentication);
+
+    authPopup.on('closed', () => {
       console.info('[PCG] popup closed, reloading panel');
-      this.authPopup = null;
+      if (this.authPopup === authPopup) {
+        this.authPopup = null;
+      }
+      this.isClosingAuthenticatedPopup = false;
       this.reloadPanelAfterAuth();
       this.setStatus({
         ...this.status,
@@ -517,9 +530,44 @@ export class TmcPcgSessionManager {
       });
     });
 
-    void this.authPopup.loadURL(url);
+    void authPopup.loadURL(url);
   }
 
+  /**
+   * Closes the PCG Twitch popup only after its persistent partition has a
+   * Twitch session cookie. Cookie values are never read or logged.
+   */
+  private async closeAuthPopupWhenAuthenticated(
+    authPopup: BrowserWindow,
+  ): Promise<void> {
+    if (
+      this.authPopup !== authPopup ||
+      authPopup.isDestroyed() ||
+      this.isClosingAuthenticatedPopup
+    ) {
+      return;
+    }
+
+    try {
+      const cookies = await authPopup.webContents.session.cookies.get({
+        url: 'https://www.twitch.tv',
+        name: TWITCH_AUTH_COOKIE_NAME,
+      });
+
+      if (cookies.length === 0 || this.authPopup !== authPopup) {
+        return;
+      }
+
+      this.isClosingAuthenticatedPopup = true;
+      this.setStatus({
+        ...this.status,
+        message: 'Twitch sign-in completed. Reloading PCG panel.',
+      });
+      authPopup.close();
+    } catch {
+      // Keep the popup open when the session state cannot be confirmed.
+    }
+  }
   private reloadPanelAfterAuth(): void {
     if (!this.view || this.view.webContents.isDestroyed()) {
       return;

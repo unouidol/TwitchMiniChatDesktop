@@ -106,3 +106,5 @@ local.properties
 *.sqlite3
 secrets/
 credentials/
+
+release/

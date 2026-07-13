@@ -3,6 +3,7 @@
   LoadHistoryResult,
   TmcHistoryMessage,
 } from '../../shared/backend/TmcHistoryModels';
+import type { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 
 /**
@@ -65,7 +66,10 @@ export class TmcBackendClient {
   /**
    * Creates a backend client.
    */
-  constructor(private readonly config: TmcRuntimeConfig) {}
+  constructor(
+    private readonly config: TmcRuntimeConfig,
+    private readonly authSessionStore: TmcAuthSessionStore,
+  ) {}
 
   /**
    * Loads cached chat history from the TMC backend.
@@ -73,30 +77,30 @@ export class TmcBackendClient {
   async loadHistory(request: LoadHistoryRequest): Promise<LoadHistoryResult> {
     const channel = normalizeChannel(request.channel);
     const seconds = normalizeHistorySeconds(request.seconds);
+    const desktopSessionToken =
+      this.authSessionStore.getSession()?.desktopSessionToken?.trim();
 
-if (!this.config.historySecretKey) {
-  throw new Error(
-    'Missing TMC_HISTORY_SECRET_KEY in local.properties or environment variables for /history authorization.',
-  );
-}
+    if (!desktopSessionToken) {
+      throw new Error('Desktop session unavailable. Please sign in again.');
+    }
 
-const url = buildAndroidCompatibleHistoryUrl(
-  this.config.backendBaseUrl,
-  channel,
-  seconds,
-  this.config.historySecretKey,
-);
+    const url = buildHistoryUrl(this.config.backendBaseUrl, channel, seconds);
 
-const response = await fetch(url, {
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        Authorization: `Bearer ${desktopSessionToken}`,
         'Cache-Control': 'no-cache',
         'User-Agent': buildUserAgent(this.config),
         'X-TMC-Client': this.config.desktopClientId,
         'X-TMC-Client-Version': this.config.desktopClientVersion,
       },
     });
+
+    if (response.status === 401) {
+      throw new Error('Desktop session expired. Please sign in again.');
+    }
 
     if (!response.ok) {
       const responseBody = await safelyReadResponseText(response);
@@ -124,23 +128,17 @@ const response = await fetch(url, {
 }
 
 /**
- * Builds a history URL matching the Android client behavior.
- *
- * Android currently appends the history secret directly as a raw query value:
- * `&key=${BuildConfig.HISTORY_SECRET_KEY}`. The desktop client mirrors that
- * behavior because URLSearchParams may encode special characters differently
- * from what the current Python backend expects.
+ * Builds the public history endpoint URL.
  */
-function buildAndroidCompatibleHistoryUrl(
+function buildHistoryUrl(
   backendBaseUrl: string,
   channel: string,
   seconds: number,
-  historySecretKey: string,
 ): string {
   const normalizedBaseUrl = backendBaseUrl.replace(/\/+$/, '');
   const encodedChannel = encodeURIComponent(channel);
 
-  return `${normalizedBaseUrl}/history?channel=${encodedChannel}&seconds=${seconds}&key=${historySecretKey}`;
+  return `${normalizedBaseUrl}/history?channel=${encodedChannel}&seconds=${seconds}`;
 }
 
 /**

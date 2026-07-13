@@ -76,6 +76,7 @@ export class TmcChannelChatController {
   private readonly channelInput: HTMLInputElement | null;
   private readonly loadHistoryButton: HTMLButtonElement | null;
   private readonly favoriteToggleButton: HTMLButtonElement | null;
+  private readonly liveStatusElement: HTMLElement | null;
   private readonly pcgSessionPanel: TmcPcgSessionPanelController | null;
   private readonly renderedMessageKeys: string[] = [];
   private readonly renderedMessageKeySet = new Set<string>();
@@ -83,6 +84,7 @@ export class TmcChannelChatController {
   private readonly unsubscribeStatusChanged: () => void;
   private currentChannel: string | null = null;
   private lastRenderedStatusKey: string | null = null;
+  private liveStatusRevision = 0;
   private activeChannelState: TmcAccountChannelState | null = null;
   private generation = 0;
 
@@ -102,6 +104,9 @@ export class TmcChannelChatController {
     this.channelInput = options.channelInput;
     this.loadHistoryButton = options.loadHistoryButton || null;
     this.pcgSessionPanel = options.pcgSessionPanel || null;
+    this.liveStatusElement = document.querySelector<HTMLElement>(
+      '[data-tmc-live-status]',
+    );
 
     let channelControls: ChannelSidebarControls = {
       favoriteToggleButton: null,
@@ -145,6 +150,7 @@ export class TmcChannelChatController {
    */
   async initialize(): Promise<void> {
     try {
+      await this.refreshLiveStatus();
       await this.switchToActiveAccountChannel();
     } catch (error) {
       appendLocalMessage('error', getErrorMessage(error));
@@ -450,6 +456,8 @@ export class TmcChannelChatController {
   }
 
   private handleStatusChanged(status: TmcChatLiveStatus): void {
+    this.liveStatusRevision += 1;
+    this.renderLiveStatus(status);
     const statusChannel = status.channel ? normalizeChannel(status.channel) : null;
 
     if (statusChannel && this.currentChannel && statusChannel !== this.currentChannel) {
@@ -474,6 +482,25 @@ export class TmcChannelChatController {
     }
   }
 
+  private async refreshLiveStatus(): Promise<void> {
+    const revisionBeforeRequest = this.liveStatusRevision;
+    const status = await this.tmc.chat.getStatus();
+
+    if (revisionBeforeRequest !== this.liveStatusRevision) {
+      return;
+    }
+
+    this.renderLiveStatus(status);
+  }
+
+  private renderLiveStatus(status: TmcChatLiveStatus): void {
+    if (!this.liveStatusElement) {
+      return;
+    }
+
+    this.liveStatusElement.textContent = `Live: ${status.state}`;
+    this.liveStatusElement.dataset.tmcLiveState = status.state;
+  }
   private rememberHistoryMessages(messages: readonly TmcHistoryMessage[]): void {
     for (const message of messages) {
       const key = buildHistoryMessageDedupKey(message);

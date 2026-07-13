@@ -1,5 +1,8 @@
-import { TMC_ACCOUNT_CHANGED_EVENT } from '../accounts/initializeAccountSwitcher';
-import { TMC_CHANNEL_CHANGED_EVENT } from '../chat/TmcChannelChatController';
+﻿import { TMC_ACCOUNT_CHANGED_EVENT } from '../accounts/initializeAccountSwitcher';
+import {
+  TMC_AUTH_LOGGED_IN_EVENT,
+  TMC_CHANNEL_CHANGED_EVENT,
+} from '../chat/TmcChannelChatController';
 import type { TmcPcgStatus } from '../../shared/pcg/TmcPcgModels';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
 
@@ -25,6 +28,10 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
   let lastKnownChannel = readChannelFromInput();
   let frameHandle: number | null = null;
 
+  if (loginButton) {
+    loginButton.disabled = true;
+  }
+
   const renderStatus = (status: TmcPcgStatus): void => {
     currentDisplayMode = status.displayMode;
     host?.classList.toggle('tmc-pcg-host-detached', status.displayMode === 'detached');
@@ -35,6 +42,10 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
 
     if (statusElement) {
       statusElement.textContent = formatPcgStatus(status);
+    }
+
+    if (loginButton) {
+      loginButton.disabled = status.state !== 'active';
     }
   };
 
@@ -136,8 +147,6 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
         channel: lastKnownChannel,
         message: getErrorMessage(error),
       });
-    } finally {
-      loginButton.disabled = false;
     }
   });
 
@@ -168,6 +177,9 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
 
   window.addEventListener('resize', scheduleBoundsSync);
   window.addEventListener(TMC_ACCOUNT_CHANGED_EVENT, () => {
+    void activatePcg(lastKnownChannel);
+  });
+  window.addEventListener(TMC_AUTH_LOGGED_IN_EVENT, () => {
     void activatePcg(lastKnownChannel);
   });
   window.addEventListener(TMC_CHANNEL_CHANGED_EVENT, (event) => {
