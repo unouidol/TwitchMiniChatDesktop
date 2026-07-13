@@ -1,4 +1,4 @@
-﻿import { BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import path from 'node:path';
 
 /**
@@ -20,9 +20,9 @@ declare const MAIN_WINDOW_VITE_NAME: string;
  */
 export function createMainWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
-    width: 1100,
+    width: 1160,
     height: 720,
-    minWidth: 900,
+    minWidth: 1040,
     minHeight: 560,
     title: 'Twitch Mini Chat Desktop',
     backgroundColor: '#111827',

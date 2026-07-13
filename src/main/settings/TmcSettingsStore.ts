@@ -42,9 +42,16 @@ export class TmcSettingsStore {
 
   /**
    * Updates the selected channel and moves it to the top of recent channels.
+   *
+   * Throws when the requested channel is empty after normalization.
    */
   async setCurrentChannel(channel: string): Promise<TmcDesktopSettings> {
     const normalizedChannel = normalizeChannel(channel);
+
+    if (normalizedChannel.length === 0) {
+      throw new Error('Channel name cannot be empty.');
+    }
+
     const currentSettings = await this.loadSettings();
 
     const recentChannels = [

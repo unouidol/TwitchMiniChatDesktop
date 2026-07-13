@@ -1,7 +1,8 @@
-﻿import './index.css';
+import './index.css';
+
 import { bootstrapRenderer } from './renderer/bootstrap/bootstrapRenderer';
 
 /**
- * Renderer entrypoint for the local TMC Desktop user interface.
+ * Starts the TMC Desktop renderer shell.
  */
 void bootstrapRenderer();

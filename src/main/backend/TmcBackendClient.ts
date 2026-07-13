@@ -31,15 +31,29 @@ type RawHistoryMessage = {
 };
 
 /**
+ * Raw object-shaped backend history response.
+ */
+type RawHistoryEnvelope = {
+  /**
+   * Message list when the backend wraps history as `messages`.
+   */
+  readonly messages?: unknown;
+
+  /**
+   * Message list when the backend wraps history as `history`.
+   */
+  readonly history?: unknown;
+
+  /**
+   * Message list when the backend wraps history as `items`.
+   */
+  readonly items?: unknown;
+};
+
+/**
  * Raw backend history response shape.
  */
-type RawHistoryResponse =
-  | readonly RawHistoryMessage[]
-  | {
-      readonly messages?: unknown;
-      readonly history?: unknown;
-      readonly items?: unknown;
-    };
+type RawHistoryResponse = readonly RawHistoryMessage[] | RawHistoryEnvelope;
 
 /**
  * Client for the TMC backend HTTP API.
@@ -205,21 +219,44 @@ function normalizeHistorySeconds(seconds: number): number {
 /**
  * Extracts a message array from supported backend response shapes.
  */
-function extractRawMessages(rawJson: RawHistoryResponse): readonly RawHistoryMessage[] {
-  if (Array.isArray(rawJson)) {
+function extractRawMessages(
+  rawJson: RawHistoryResponse,
+): readonly RawHistoryMessage[] {
+  if (isRawHistoryMessageArray(rawJson)) {
     return rawJson;
   }
 
-  if (Array.isArray(rawJson.messages)) {
-    return rawJson.messages as readonly RawHistoryMessage[];
+  return extractRawMessagesFromEnvelope(rawJson);
+}
+
+/**
+ * Checks whether the raw backend response is a direct message array.
+ *
+ * This explicit type guard is needed because TypeScript does not always narrow
+ * readonly array unions reliably through Array.isArray alone.
+ */
+function isRawHistoryMessageArray(
+  rawJson: RawHistoryResponse,
+): rawJson is readonly RawHistoryMessage[] {
+  return Array.isArray(rawJson);
+}
+
+/**
+ * Extracts a message array from object-shaped backend history responses.
+ */
+function extractRawMessagesFromEnvelope(
+  envelope: RawHistoryEnvelope,
+): readonly RawHistoryMessage[] {
+  if (Array.isArray(envelope.messages)) {
+    return envelope.messages as readonly RawHistoryMessage[];
   }
 
-  if (Array.isArray(rawJson.history)) {
-    return rawJson.history as readonly RawHistoryMessage[];
+  if (Array.isArray(envelope.history)) {
+    return envelope.history as readonly RawHistoryMessage[];
   }
 
-  if (Array.isArray(rawJson.items)) {
-    return rawJson.items as readonly RawHistoryMessage[];
+  if (Array.isArray(envelope.items)) {
+    return envelope.items as readonly RawHistoryMessage[];
   }
 
   return [];

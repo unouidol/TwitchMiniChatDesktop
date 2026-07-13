@@ -1,64 +1,57 @@
-﻿import { renderRecentChannels } from '../channels/renderRecentChannels';
+import { initializeAccountSwitcher } from '../accounts/initializeAccountSwitcher';
+import { initializeAuthPanel } from '../auth/initializeAuthPanel';
 import { appendLocalMessage } from '../chat/appendLocalMessage';
-import { renderHistoryMessages } from '../chat/renderHistoryMessages';
+import { TmcChannelChatController } from '../chat/TmcChannelChatController';
+import { initializePcgPanel } from '../pcg/initializePcgPanel';
+import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
+//import { initializePcgSessionPanel } from '../pcg/initializePcgSessionPanel';
 
 /**
  * Initializes the local TMC Desktop renderer.
  *
- * This bootstrap wires the temporary shell UI only. Real Twitch authorization,
- * live Internet Relay Chat, and PokémonCommunityGame snapshots will be added
- * through dedicated modules.
+ * This bootstrap wires the local shell UI. Twitch authorization, backend
+ * history loading, and passive live chat are delegated to dedicated modules.
  */
 export async function bootstrapRenderer(): Promise<void> {
-  const appInfoElement = document.querySelector<HTMLParagraphElement>('#appInfo');
-  const pingButton = document.querySelector<HTMLButtonElement>('#pingButton');
+  const tmc = window.tmc as TmcRendererPreloadApi;
   const composerForm = document.querySelector<HTMLFormElement>('#composerForm');
   const messageInput = document.querySelector<HTMLInputElement>('#messageInput');
   const channelInput = document.querySelector<HTMLInputElement>('#channelInput');
+  const channelForm = document.querySelector<HTMLFormElement>('#channelForm');
+  //const pcgSessionPanel = initializePcgSessionPanel(tmc);
   const loadHistoryButton =
     document.querySelector<HTMLButtonElement>('#loadHistoryButton');
+  const chatController = new TmcChannelChatController({
+    tmc,
+    channelInput,
+    loadHistoryButton,
+    //pcgSessionPanel,
+  });
 
-  const appInfo = window.tmc.getAppInfo();
+  initializeAccountSwitcher(tmc);
 
-  if (appInfoElement) {
-    appInfoElement.textContent = `${appInfo.appName} running on ${appInfo.platform}`;
+  try {
+    initializePcgPanel(tmc);
+  } catch (error) {
+    console.warn('[TMC PCG] Panel initialization failed:', error);
   }
 
-  await initializeSettings(channelInput);
+  await initializeAuthPanel();
 
-  pingButton?.addEventListener('click', async () => {
-    const result = await window.tmc.ping();
-    appendLocalMessage('main', result);
-  });
 
-  loadHistoryButton?.addEventListener('click', async () => {
-    const channel = readSelectedChannel(channelInput);
+  channelForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
 
-    loadHistoryButton.disabled = true;
-    appendLocalMessage('system', `Loading history for #${channel}...`);
+    const requestedChannel = normalizeChannel(channelInput?.value ?? '');
 
-    try {
-      const settings = await window.tmc.settings.setCurrentChannel({ channel });
-      updateChannelUi(channelInput, settings.currentChannel, settings.recentChannels);
-
-      const result = await window.tmc.backend.loadHistory({
-        channel: settings.currentChannel,
-        seconds: 3600,
-      });
-
-      renderHistoryMessages(result.messages);
-      appendLocalMessage(
-        'system',
-        `Loaded ${result.messages.length} cached messages for #${result.channel}.`,
-      );
-    } catch (error) {
-      appendLocalMessage('error', getErrorMessage(error));
-    } finally {
-      loadHistoryButton.disabled = false;
+    if (!requestedChannel) {
+      return;
     }
+
+    void chatController.switchToChannel(requestedChannel);
   });
 
-  composerForm?.addEventListener('submit', (event) => {
+  composerForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
     const text = messageInput?.value.trim();
@@ -67,66 +60,32 @@ export async function bootstrapRenderer(): Promise<void> {
       return;
     }
 
-    /*
-     * Manual-only placeholder: one explicit user submit appends one visible
-     * local message. Real Twitch sending will remain user-triggered.
-     */
-    appendLocalMessage('you', text);
+    const channel = readSelectedChannel(channelInput);
 
-    if (messageInput) {
-      messageInput.value = '';
-      messageInput.focus();
+    try {
+      await tmc.chat.sendMessage({ channel, text });
+
+      if (messageInput) {
+        messageInput.value = '';
+        messageInput.focus();
+      }
+    } catch {
+      appendLocalMessage('system', 'Live chat connection required.');
     }
   });
-}
 
-/**
- * Loads settings and initializes the visible channel controls.
- */
-async function initializeSettings(
-  channelInput: HTMLInputElement | null,
-): Promise<void> {
-  try {
-    const settings = await window.tmc.settings.get();
-    updateChannelUi(channelInput, settings.currentChannel, settings.recentChannels);
-  } catch (error) {
-    appendLocalMessage('error', getErrorMessage(error));
-  }
-}
-
-/**
- * Updates the channel input and recent channel shortcuts.
- */
-function updateChannelUi(
-  channelInput: HTMLInputElement | null,
-  currentChannel: string,
-  recentChannels: readonly string[],
-): void {
-  if (channelInput) {
-    channelInput.value = currentChannel;
-  }
-
-  renderRecentChannels(recentChannels, (channel) => {
-    if (channelInput) {
-      channelInput.value = channel;
-    }
-  });
+  await chatController.initialize();
 }
 
 /**
  * Reads the currently selected channel from the shell input.
  */
 function readSelectedChannel(channelInput: HTMLInputElement | null): string {
-  return channelInput?.value.trim().replace(/^#/, '') || 'unouidol';
+  return normalizeChannel(channelInput?.value ?? '') || 'unouidol';
 }
 
-/**
- * Converts an unknown error into a user-visible message.
- */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Unknown backend error while loading history.';
+function normalizeChannel(channel: string): string {
+  return channel.trim().replace(/^#/, '').toLowerCase();
 }
+
+

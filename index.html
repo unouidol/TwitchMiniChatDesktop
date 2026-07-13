@@ -1,10 +1,10 @@
-﻿<!doctype html>
-<html lang="it">
+<!doctype html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'self';"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; form-action 'self';"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Twitch Mini Chat Desktop</title>
@@ -12,49 +12,127 @@
 
   <body>
     <main class="tmc-shell">
-      <section class="tmc-header">
-        <div>
-          <h1>Twitch Mini Chat Desktop</h1>
-          <p id="appInfo">Loading app info...</p>
+      <header class="tmc-header">
+        <div class="tmc-header-title" aria-label="Twitch Mini Chat Desktop">
+          <h1>TMC Desktop</h1>
         </div>
 
-        <button id="pingButton" type="button">Ping main process</button>
-      </section>
+        <div class="tmc-header-actions">
+          <section class="tmc-panel tmc-auth-panel" aria-labelledby="tmc-auth-title">
+            <h2 id="tmc-auth-title" class="tmc-auth-title">Twitch login</h2>
+
+            <p class="tmc-auth-status" data-tmc-auth-status>
+              Not logged in.
+            </p>
+
+            <div class="tmc-auth-controls">
+              <button type="button" class="tmc-button tmc-auth-login-button" data-tmc-auth-login>
+                Login with Twitch
+              </button>
+
+              <div class="tmc-auth-code-group">
+                <label class="tmc-field-label" for="tmc-login-code">
+                  Paste login code
+                </label>
+
+                <div class="tmc-auth-finalize-row">
+                  <input
+                    id="tmc-login-code"
+                    class="tmc-text-input tmc-auth-code-input"
+                    type="text"
+                    autocomplete="one-time-code"
+                    spellcheck="false"
+                    data-tmc-auth-code
+                    placeholder="Paste code from browser"
+                  />
+
+                  <button
+                    type="button"
+                    class="tmc-button tmc-button-secondary tmc-auth-finalize-button"
+                    data-tmc-auth-finalize
+                  >
+                    Finalize login
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tmc-panel tmc-account-panel" aria-label="Accounts">
+            <div class="tmc-account-header">
+              <span class="tmc-section-kicker">Account</span>
+            </div>
+
+            <div class="tmc-account-content" data-tmc-account-switcher>
+              <span class="tmc-muted">Loading accounts...</span>
+            </div>
+          </section>
+
+
+        </div>
+      </header>
 
       <section class="tmc-layout">
         <aside class="tmc-sidebar">
-          <h2>Channels</h2>
+          <div class="tmc-panel tmc-sidebar-panel">
+            <h2>Channels</h2>
 
-          <label class="tmc-channel-form">
-            <span>Current channel</span>
-            <input
-              id="channelInput"
-              class="tmc-channel-input"
-              type="text"
-              value="unouidol"
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </label>
+            <form class="tmc-channel-form" id="channelForm">
+              <label class="tmc-field-label" for="channelInput">
+                Current channel
+              </label>
 
-          <button id="loadHistoryButton" type="button" class="tmc-primary-button">
-            Load history
-          </button>
+              <input
+                id="channelInput"
+                class="tmc-channel-input"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="unouidol"
+              />
 
-          <div>
-            <h3 class="tmc-sidebar-subtitle">Recent channels</h3>
-            <div
-              id="recentChannelsContainer"
-              class="tmc-channel-shortcuts"
-            ></div>
+              <button id="loadHistoryButton" class="tmc-primary-button" type="submit">
+                Refresh history
+              </button>
+            </form>
+
+            <div class="tmc-channel-section">
+              <h3>Recent</h3>
+              <div class="tmc-channel-shortcuts" data-tmc-recent-channels>
+                <button type="button" class="tmc-channel-button" data-channel="unouidol">
+                  #unouidol
+                </button>
+                <button type="button" class="tmc-channel-button" data-channel="lukankuro">
+                  #lukankuro
+                </button>
+              </div>
+            </div>
+
+            <div class="tmc-channel-section">
+              <h3>Favorites</h3>
+              <div class="tmc-channel-shortcuts" data-tmc-favorite-channels>
+                <p class="tmc-muted">No favorites yet.</p>
+              </div>
+            </div>
           </div>
         </aside>
 
         <section class="tmc-chat">
+          <div class="tmc-chat-toolbar">
+            <div>
+              <span class="tmc-section-kicker">Chat</span>
+              <strong id="chatChannelLabel">#unouidol</strong>
+            </div>
+
+            <p class="tmc-live-status" data-tmc-live-status>
+              Live: disconnected
+            </p>
+          </div>
+
           <div class="tmc-chat-list" id="chatList">
-            <article class="tmc-message">
+            <article class="tmc-message tmc-message-system">
               <strong>system</strong>
-              <span>TMC Desktop skeleton ready.</span>
+              <span>TMC Desktop ready.</span>
             </article>
           </div>
 
@@ -65,13 +143,45 @@
               autocomplete="off"
               placeholder="Write a manual chat command or message..."
             />
-            <button type="submit">Send</button>
+            <button class="tmc-button" type="submit">
+              Send
+            </button>
           </form>
         </section>
 
         <aside class="tmc-pcg-panel">
-          <h2>PCG</h2>
-          <p>Probe panel placeholder.</p>
+          <div class="tmc-panel tmc-pcg-card">
+            <div class="tmc-pcg-header">
+              <div>
+                <span class="tmc-section-kicker">PCG</span>
+                <h2>PokémonCommunityGame</h2>
+              </div>
+
+              <div class="tmc-pcg-actions">
+                <p class="tmc-pcg-status" data-tmc-pcg-status>
+                  PCG: empty
+                </p>
+
+                <button
+                  type="button"
+                  class="tmc-button tmc-button-secondary tmc-pcg-login-button"
+                  data-tmc-pcg-login
+                >
+                  Sign in to Twitch for PCG
+                </button>
+
+                <button
+                  type="button"
+                  class="tmc-button tmc-button-secondary tmc-pcg-detach-button"
+                  data-tmc-pcg-detach
+                >
+                  Open PCG in a separate window
+                </button>
+              </div>
+            </div>
+
+            <div id="pcgHost" class="tmc-pcg-host"></div>
+          </div>
         </aside>
       </section>
     </main>
@@ -79,3 +189,4 @@
     <script type="module" src="/src/renderer.ts"></script>
   </body>
 </html>
+

@@ -1,4 +1,4 @@
-﻿import { readLocalPropertiesFromProjectRoot } from './LocalPropertiesReader';
+import { readLocalPropertiesFromProjectRoot } from './LocalPropertiesReader';
 
 /**
  * Runtime configuration used by the Electron main process.
@@ -25,12 +25,50 @@ export type TmcRuntimeConfig = {
   readonly desktopClientVersion: string;
 
   /**
+   * Desktop flavor used by backend/OAuth diagnostics.
+   */
+  readonly desktopFlavor: string;
+
+  /**
    * Optional secret key required by the current TMC history endpoint.
    *
    * Do not hardcode this value in the desktop source tree. During development,
    * put it in local.properties as TMC_HISTORY_SECRET_KEY.
    */
   readonly historySecretKey?: string;
+
+  /**
+   * Public backend URL used to start the Twitch OAuth flow.
+   *
+   * This is not a secret. The backend must keep client_secret and token exchange
+   * logic server-side.
+   */
+  readonly oauthStartUrl?: string;
+
+  /**
+   * Public backend URL used to finalize an OAuth login token.
+   */
+  readonly oauthFinalizeUrl: string;
+
+  /**
+   * Public backend URL used to restore a durable desktop OAuth session.
+   */
+  readonly oauthDesktopRestoreUrl: string;
+
+  /**
+   * Public backend URL used to logout one durable desktop OAuth session.
+   */
+  readonly oauthDesktopLogoutUrl: string;
+
+  /**
+   * Desktop custom scheme used by the backend OAuth callback.
+   */
+  /**
+   * Optional PCG extension URL template. Use {channel} as placeholder.
+   */
+  readonly pcgExtensionUrlTemplate?: string;
+
+  readonly oauthReturnScheme: string;
 };
 
 const localProperties = readLocalPropertiesFromProjectRoot();
@@ -82,6 +120,17 @@ function readConfigInt(
 }
 
 /**
+ * Builds a backend endpoint URL from the base URL.
+ */
+function buildBackendUrl(path: string): string {
+  const baseUrl = readConfigValue('TMC_BACKEND_BASE_URL', [
+    'TMC_BACKEND_BASE_URL',
+  ]) || 'https://api.ircminichat.party';
+
+  return `${baseUrl.replace(/\/+$/, '')}${path}`;
+}
+
+/**
  * Default runtime configuration for TMC Desktop.
  *
  * Environment variables and local.properties are supported to make dev/stable
@@ -109,13 +158,47 @@ export const TMC_RUNTIME_CONFIG: TmcRuntimeConfig = {
     ]) ||
     '0.1.0',
 
+  desktopFlavor:
+    readConfigValue('TMC_DESKTOP_FLAVOR', ['TMC_DESKTOP_FLAVOR']) || 'dev',
+
   historySecretKey: readConfigValue('TMC_HISTORY_SECRET_KEY', [
     'TMC_HISTORY_SECRET_KEY',
-    /*
-     * Android compatibility aliases, useful if you copy the same key name from
-     * the Android local.properties file.
-     */
     'HISTORY_SECRET_KEY',
     'historySecretKey',
   ]),
+
+  oauthStartUrl: readConfigValue('TMC_OAUTH_START_URL', [
+    'TMC_OAUTH_START_URL',
+    'OAUTH_START_URL',
+  ]),
+
+  oauthFinalizeUrl:
+    readConfigValue('TMC_OAUTH_FINALIZE_URL', [
+      'TMC_OAUTH_FINALIZE_URL',
+      'OAUTH_FINALIZE_URL',
+    ]) || buildBackendUrl('/oauth/finalize'),
+
+  oauthDesktopRestoreUrl:
+    readConfigValue('TMC_OAUTH_DESKTOP_RESTORE_URL', [
+      'TMC_OAUTH_DESKTOP_RESTORE_URL',
+      'OAUTH_DESKTOP_RESTORE_URL',
+    ]) || buildBackendUrl('/oauth/desktop/restore'),
+
+  oauthDesktopLogoutUrl:
+    readConfigValue('TMC_OAUTH_DESKTOP_LOGOUT_URL', [
+      'TMC_OAUTH_DESKTOP_LOGOUT_URL',
+      'OAUTH_DESKTOP_LOGOUT_URL',
+    ]) || buildBackendUrl('/oauth/desktop/logout'),
+
+  oauthReturnScheme:
+    readConfigValue('TMC_OAUTH_RETURN_SCHEME', [
+      'TMC_OAUTH_RETURN_SCHEME',
+      'OAUTH_RETURN_SCHEME',
+    ]) || 'desktop-claim',
+
+  pcgExtensionUrlTemplate:
+  readConfigValue('TMC_PCG_EXTENSION_URL_TEMPLATE', [
+    'TMC_PCG_EXTENSION_URL_TEMPLATE',
+  ]) ||
+  'https://www.twitch.tv/popout/{channel}/extensions/pm0qkv9g4h87t5y6lg329oam8j7ze9/panel',
 };

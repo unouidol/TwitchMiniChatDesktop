@@ -93,3 +93,16 @@ out/
 
 # Local developer secrets
 local.properties
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.db
+*.sqlite
+*.sqlite3
+secrets/
+credentials/
