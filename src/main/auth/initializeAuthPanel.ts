@@ -72,7 +72,7 @@ interface TmcAuthWindowApi {
  * Initializes the manual Twitch claim-code login panel.
  */
 export function initializeAuthPanel(): void {
-  const tmc = (window as Window & typeof globalThis & { tmc?: TmcAuthWindowApi }).tmc;
+  const tmc = (window as unknown as { tmc?: TmcAuthWindowApi }).tmc;
 
   const loginButton = document.querySelector<HTMLButtonElement>('[data-tmc-auth-login]');
   const finalizeButton = document.querySelector<HTMLButtonElement>('[data-tmc-auth-finalize]');

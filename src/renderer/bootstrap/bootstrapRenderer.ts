@@ -1,6 +1,7 @@
 import { initializeAccountSwitcher } from '../accounts/initializeAccountSwitcher';
 import { initializeAuthPanel } from '../auth/initializeAuthPanel';
 import { appendLocalMessage } from '../chat/appendLocalMessage';
+import { TmcChatInputHistoryController } from '../chat/TmcChatInputHistoryController';
 import { TmcChannelChatController } from '../chat/TmcChannelChatController';
 import { initializePcgPanel } from '../pcg/initializePcgPanel';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
@@ -21,6 +22,9 @@ export async function bootstrapRenderer(): Promise<void> {
   //const pcgSessionPanel = initializePcgSessionPanel(tmc);
   const loadHistoryButton =
     document.querySelector<HTMLButtonElement>('#loadHistoryButton');
+  const inputHistoryController = messageInput
+    ? new TmcChatInputHistoryController(messageInput, readActiveAccountId)
+    : null;
   const chatController = new TmcChannelChatController({
     tmc,
     channelInput,
@@ -61,9 +65,11 @@ export async function bootstrapRenderer(): Promise<void> {
     }
 
     const channel = readSelectedChannel(channelInput);
+    const activeAccountId = readActiveAccountId();
 
     try {
       await tmc.chat.sendMessage({ channel, text });
+      inputHistoryController?.recordSentMessage(text, activeAccountId);
 
       if (messageInput) {
         messageInput.value = '';
@@ -82,6 +88,18 @@ export async function bootstrapRenderer(): Promise<void> {
  */
 function readSelectedChannel(channelInput: HTMLInputElement | null): string {
   return normalizeChannel(channelInput?.value ?? '') || 'unouidol';
+}
+
+/**
+ * Reads the active account profile identifier from the existing account selector.
+ */
+function readActiveAccountId(): string | null {
+  const accountSelect = document.querySelector<HTMLSelectElement>(
+    '[data-tmc-account-select]',
+  );
+  const profileId = accountSelect?.value.trim() || '';
+
+  return profileId || null;
 }
 
 function normalizeChannel(channel: string): string {

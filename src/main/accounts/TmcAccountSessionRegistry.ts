@@ -203,7 +203,7 @@ export class TmcAccountSessionRegistry {
 
   private async persistAccountsSafely(): Promise<void> {
     try {
-      await this.accountStore.saveAccounts(this.getSortedAccounts());
+      await this.accountStore.saveAccounts();
     } catch {
       console.warn('[TMC Accounts] Account registry persistence skipped.');
     }

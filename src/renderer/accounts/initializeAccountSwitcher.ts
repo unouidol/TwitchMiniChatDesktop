@@ -10,6 +10,11 @@ import { appendLocalMessage } from '../chat/appendLocalMessage';
  */
 export const TMC_ACCOUNT_CHANGED_EVENT = 'tmc:account:changed';
 
+/**
+ * Window event emitted after one desktop account is removed locally.
+ */
+export const TMC_ACCOUNT_REMOVED_EVENT = 'tmc:account:removed';
+
 const TMC_AUTH_LOGGED_IN_EVENT = 'tmc:auth:logged-in';
 const REMOVE_ACCOUNT_CONFIRM_MESSAGE =
   'Remove this account from this device? This will not delete Twitch or server data.';
@@ -58,6 +63,11 @@ export function initializeAccountSwitcher(
     try {
       const result = await tmc.accounts.removeLocal({ profileId });
       renderAccountList(elements, result);
+      window.dispatchEvent(
+        new CustomEvent(TMC_ACCOUNT_REMOVED_EVENT, {
+          detail: { profileId },
+        }),
+      );
       window.dispatchEvent(new CustomEvent(TMC_ACCOUNT_CHANGED_EVENT));
     } catch (error) {
       appendLocalMessage('error', getErrorMessage(error));

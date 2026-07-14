@@ -1,10 +1,12 @@
 ﻿import type { TmcHistoryMessage } from '../../shared/backend/TmcHistoryModels';
+import type { TmcChatScrollController } from './TmcChatScrollController';
 
 /**
  * Replaces the temporary chat list with backend history messages.
  */
 export function renderHistoryMessages(
   messages: readonly TmcHistoryMessage[],
+  scrollController?: TmcChatScrollController | null,
 ): void {
   const chatList = document.querySelector<HTMLDivElement>('#chatList');
 
@@ -18,7 +20,11 @@ export function renderHistoryMessages(
     chatList.appendChild(createHistoryMessageElement(message));
   }
 
-  chatList.scrollTop = chatList.scrollHeight;
+  if (scrollController) {
+    scrollController.handleInitialHistoryLoaded();
+  } else {
+    chatList.scrollTop = chatList.scrollHeight;
+  }
 }
 
 /**
