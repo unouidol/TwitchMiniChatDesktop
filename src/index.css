@@ -346,11 +346,47 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.tmc-chat-feed {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .tmc-chat-list {
   flex: 1;
   min-height: 0;
   padding: 0.8rem;
   overflow: auto;
+}
+
+.tmc-new-messages-button {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.75rem;
+  min-height: 30px;
+  border: 1px solid rgba(196, 181, 253, 0.32);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  color: #f8fafc;
+  background: rgba(91, 33, 182, 0.96);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.34);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.tmc-new-messages-button:hover {
+  background: rgba(109, 40, 217, 0.98);
+}
+
+.tmc-new-messages-button:focus-visible {
+  outline: 2px solid #c4b5fd;
+  outline-offset: 2px;
+}
+
+.tmc-new-messages-button[hidden] {
+  display: none;
 }
 
 .tmc-message {

@@ -43,7 +43,7 @@ export function registerPcgIpcHandlers(options: {
         options.accountChannelStore,
       );
 
-      if (!activation.ok) {
+      if (activation.ok === false) {
         return sendAndReturnStatus(sendStatusChanged, activation.status);
       }
 

@@ -129,11 +129,24 @@
             </p>
           </div>
 
-          <div class="tmc-chat-list" id="chatList">
-            <article class="tmc-message tmc-message-system">
-              <strong>system</strong>
-              <span>TMC Desktop ready.</span>
-            </article>
+          <div class="tmc-chat-feed">
+            <div class="tmc-chat-list" id="chatList">
+              <article class="tmc-message tmc-message-system">
+                <strong>system</strong>
+                <span>TMC Desktop ready.</span>
+              </article>
+            </div>
+
+            <button
+              type="button"
+              class="tmc-new-messages-button"
+              aria-label="Jump to latest"
+              title="Jump to latest"
+              data-tmc-jump-to-latest
+              hidden
+            >
+              1 new message
+            </button>
           </div>
 
           <form class="tmc-composer" id="composerForm">

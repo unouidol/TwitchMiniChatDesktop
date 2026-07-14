@@ -3,6 +3,8 @@
  */
 export {};
 
+import type { TmcRendererPreloadApi } from './renderer/TmcRendererPreloadApi';
+
 declare module '*.css' {
   const content: string;
   export default content;
@@ -10,19 +12,6 @@ declare module '*.css' {
 
 declare global {
   interface Window {
-    readonly tmc: {
-      /**
-       * Returns basic application information.
-       */
-      readonly getAppInfo: () => {
-        readonly appName: string;
-        readonly platform: NodeJS.Platform;
-      };
-
-      /**
-       * Sends a diagnostic ping to the Electron main process.
-       */
-      readonly ping: () => Promise<string>;
-    };
+    readonly tmc: TmcRendererPreloadApi;
   }
 }

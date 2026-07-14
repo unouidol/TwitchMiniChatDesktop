@@ -1,11 +1,17 @@
-﻿/**
+﻿import type { TmcChatScrollController } from './TmcChatScrollController';
+
+/**
  * Appends a local message to the temporary chat list.
  *
  * This is a UI-only placeholder. Real Twitch Internet Relay Chat sending will
  * be added later through a dedicated Twitch package and secure Inter-Process
  * Communication handler.
  */
-export function appendLocalMessage(author: string, text: string): void {
+export function appendLocalMessage(
+  author: string,
+  text: string,
+  scrollController?: TmcChatScrollController | null,
+): void {
   const chatList = document.querySelector<HTMLDivElement>('#chatList');
 
   if (!chatList) {
@@ -23,5 +29,9 @@ export function appendLocalMessage(author: string, text: string): void {
 
   messageElement.append(authorElement, textElement);
   chatList.appendChild(messageElement);
-  chatList.scrollTop = chatList.scrollHeight;
+  if (scrollController) {
+    scrollController.notifyMessagesAppended();
+  } else {
+    chatList.scrollTop = chatList.scrollHeight;
+  }
 }

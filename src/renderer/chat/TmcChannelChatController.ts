@@ -11,8 +11,9 @@ import type {
 } from '../../shared/chat/TmcChatModels';
 import type { TmcPcgSessionPanelController } from '../pcg/initializePcgSessionPanel';
 import type { TmcAccountChannelState } from '../../shared/channels/TmcAccountChannelModels';
-import { appendLocalMessage } from './appendLocalMessage';
+import { appendLocalMessage as appendLocalChatMessage } from './appendLocalMessage';
 import { renderHistoryMessages } from './renderHistoryMessages';
+import { TmcChatScrollController } from './TmcChatScrollController';
 
 /**
  * Window event emitted after a Twitch login completes successfully.
@@ -78,6 +79,7 @@ export class TmcChannelChatController {
   private readonly favoriteToggleButton: HTMLButtonElement | null;
   private readonly liveStatusElement: HTMLElement | null;
   private readonly pcgSessionPanel: TmcPcgSessionPanelController | null;
+  private readonly scrollController: TmcChatScrollController | null;
   private readonly renderedMessageKeys: string[] = [];
   private readonly renderedMessageKeySet = new Set<string>();
   private readonly unsubscribeLiveMessage: () => void;
@@ -89,10 +91,12 @@ export class TmcChannelChatController {
   private generation = 0;
 
   private readonly handleAuthLoggedIn = (): void => {
+    this.scrollController?.resetForContextChange();
     void this.reconnectCurrentChannelAfterAccountChange();
   };
 
   private readonly handleAccountChanged = (): void => {
+    this.scrollController?.resetForContextChange();
     void this.reconnectCurrentChannelAfterAccountChange();
   };
 
@@ -107,6 +111,15 @@ export class TmcChannelChatController {
     this.liveStatusElement = document.querySelector<HTMLElement>(
       '[data-tmc-live-status]',
     );
+
+    const chatList = document.querySelector<HTMLElement>('#chatList');
+    const jumpToLatestButton = document.querySelector<HTMLButtonElement>(
+      '[data-tmc-jump-to-latest]',
+    );
+
+    this.scrollController = chatList && jumpToLatestButton
+      ? new TmcChatScrollController(chatList, jumpToLatestButton)
+      : null;
 
     let channelControls: ChannelSidebarControls = {
       favoriteToggleButton: null,
@@ -153,7 +166,7 @@ export class TmcChannelChatController {
       await this.refreshLiveStatus();
       await this.switchToActiveAccountChannel();
     } catch (error) {
-      appendLocalMessage('error', getErrorMessage(error));
+      this.appendLocalMessage('error', getErrorMessage(error));
     }
   }
 
@@ -189,6 +202,7 @@ export class TmcChannelChatController {
   dispose(): void {
     this.unsubscribeLiveMessage();
     this.unsubscribeStatusChanged();
+    this.scrollController?.destroy();
     window.removeEventListener(TMC_AUTH_LOGGED_IN_EVENT, this.handleAuthLoggedIn);
     window.removeEventListener(TMC_ACCOUNT_CHANGED_EVENT, this.handleAccountChanged);
   }
@@ -214,9 +228,10 @@ export class TmcChannelChatController {
     await this.holdPcgSessionForChannelChange(generation);
 
     this.setRefreshDisabled(true);
+    this.scrollController?.resetForContextChange();
     clearChatList();
     dispatchChannelChanged(normalizedChannel);
-    appendLocalMessage('system', `Loading history for #${normalizedChannel}...`);
+    this.appendLocalMessage('system', `Loading history for #${normalizedChannel}...`);
 
     try {
       await this.tmc.accountChannels.setLast({ channel: normalizedChannel });
@@ -244,9 +259,9 @@ export class TmcChannelChatController {
         return;
       }
 
-      renderHistoryMessages(result.messages);
+      renderHistoryMessages(result.messages, this.scrollController);
       this.rememberHistoryMessages(result.messages);
-      appendLocalMessage(
+      this.appendLocalMessage(
         'system',
         `Loaded ${result.messages.length} cached messages for #${result.channel}.`,
       );
@@ -254,13 +269,17 @@ export class TmcChannelChatController {
       await this.connectLiveForChannel(normalizedChannel, generation);
     } catch (error) {
       if (this.isCurrentGeneration(generation)) {
-        appendLocalMessage('error', getErrorMessage(error));
+        this.appendLocalMessage('error', getErrorMessage(error));
       }
     } finally {
       if (this.isCurrentGeneration(generation)) {
         this.setRefreshDisabled(false);
       }
     }
+  }
+
+  private appendLocalMessage(author: string, text: string): void {
+    appendLocalChatMessage(author, text, this.scrollController);
   }
 
   private async holdPcgSessionForChannelChange(generation: number): Promise<void> {
@@ -272,7 +291,7 @@ export class TmcChannelChatController {
       await this.pcgSessionPanel.holdActiveSession();
     } catch (error) {
       if (this.isCurrentGeneration(generation)) {
-        appendLocalMessage('system', `PCG hold failed: ${getErrorMessage(error)}`);
+        this.appendLocalMessage('system', `PCG hold failed: ${getErrorMessage(error)}`);
       }
     }
   }
@@ -292,7 +311,7 @@ export class TmcChannelChatController {
       await this.pcgSessionPanel.activateSession(profileId, channel);
     } catch (error) {
       if (this.isCurrentGeneration(generation)) {
-        appendLocalMessage('system', `PCG activation failed: ${getErrorMessage(error)}`);
+        this.appendLocalMessage('system', `PCG activation failed: ${getErrorMessage(error)}`);
       }
     }
   }
@@ -375,11 +394,11 @@ export class TmcChannelChatController {
       const message = getErrorMessage(error);
 
       if (message === 'Login required.') {
-        appendLocalMessage('system', 'Login required for live chat');
+        this.appendLocalMessage('system', 'Login required for live chat');
         return;
       }
 
-      appendLocalMessage('system', `Live chat connection failed: ${message}`);
+      this.appendLocalMessage('system', `Live chat connection failed: ${message}`);
     }
   }
 
@@ -394,7 +413,7 @@ export class TmcChannelChatController {
       const result = await this.tmc.accountChannels.toggleFavorite({ channel });
       this.renderAccountChannelState(result.state);
     } catch (error) {
-      appendLocalMessage('error', getErrorMessage(error));
+      this.appendLocalMessage('error', getErrorMessage(error));
     }
   }
 
@@ -452,7 +471,7 @@ export class TmcChannelChatController {
       return;
     }
 
-    appendLiveChatMessage(message);
+    appendLiveChatMessage(message, this.scrollController);
   }
 
   private handleStatusChanged(status: TmcChatLiveStatus): void {
@@ -473,12 +492,12 @@ export class TmcChannelChatController {
     this.lastRenderedStatusKey = statusKey;
 
     if (status.state === 'connected' && statusChannel) {
-      appendLocalMessage('system', `Live connected to #${statusChannel}`);
+      this.appendLocalMessage('system', `Live connected to #${statusChannel}`);
       return;
     }
 
     if (status.state === 'error' && status.message) {
-      appendLocalMessage('system', status.message);
+      this.appendLocalMessage('system', status.message);
     }
   }
 
@@ -601,7 +620,10 @@ export function notifyAuthLoggedIn(): void {
   window.dispatchEvent(new CustomEvent(TMC_AUTH_LOGGED_IN_EVENT));
 }
 
-function appendLiveChatMessage(message: TmcLiveChatMessage): void {
+function appendLiveChatMessage(
+  message: TmcLiveChatMessage,
+  scrollController: TmcChatScrollController | null,
+): void {
   const chatList = document.querySelector<HTMLDivElement>('#chatList');
 
   if (!chatList) {
@@ -630,7 +652,7 @@ function appendLiveChatMessage(message: TmcLiveChatMessage): void {
 
   messageElement.append(timeElement, authorElement, textElement);
   chatList.appendChild(messageElement);
-  chatList.scrollTop = chatList.scrollHeight;
+  scrollController?.notifyMessagesAppended();
 }
 
 function ensureChannelSidebarControls(): ChannelSidebarControls {
