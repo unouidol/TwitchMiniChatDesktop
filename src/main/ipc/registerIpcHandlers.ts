@@ -13,10 +13,8 @@ import {
 import { TmcPcgSessionHoldManager } from '../pcg/TmcPcgSessionHoldManager';
 import { TmcPcgSessionManager } from '../pcg/TmcPcgSessionManager';
 import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
-import {
-  registerAccountIpcHandlers,
-  syncAuthSessionStore,
-} from './registerAccountIpcHandlers';
+import { registerAccountIpcHandlers } from './registerAccountIpcHandlers';
+import { syncAuthSessionStore } from '../accounts/TmcAccountRemovalService';
 import { registerAccountChannelIpcHandlers } from './registerAccountChannelIpcHandlers';
 import { registerAuthIpcHandlers } from './registerAuthIpcHandlers';
 import { registerBackendIpcHandlers } from './registerBackendIpcHandlers';
@@ -66,7 +64,12 @@ export async function registerIpcHandlers(
     return 'pong';
   });
 
-  registerAccountIpcHandlers(accountRegistry, authSessionStore);
+  const chatController = registerChatIpcHandlers(runtimeConfig, accountRegistry);
+  registerAccountIpcHandlers(accountRegistry, authSessionStore, {
+    runtimeConfig,
+    secureAuthSessionStore,
+    chatController,
+  });
   registerAccountChannelIpcHandlers(accountRegistry, accountChannelStore);
   registerAuthIpcHandlers(
     runtimeConfig,
@@ -74,14 +77,13 @@ export async function registerIpcHandlers(
     accountRegistry,
     secureAuthSessionStore,
   );
-  registerChatIpcHandlers(runtimeConfig, accountRegistry);
   registerPcgIpcHandlers({
     pcgSessionManager,
     pcgSessionHoldManager,
     accountRegistry,
     accountChannelStore,
   });
-  registerSettingsIpcHandlers(runtimeConfig);
+  registerSettingsIpcHandlers();
   registerBackendIpcHandlers(runtimeConfig, authSessionStore);
 }
 

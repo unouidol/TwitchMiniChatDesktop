@@ -148,6 +148,7 @@ export class TmcAuthBrokerClient {
       {
         desktop_session_token: desktopSessionToken,
       },
+      AbortSignal.timeout(10_000),
     );
 
     if (!response.ok) {
@@ -243,9 +244,11 @@ function postOAuthJson(
   config: TmcRuntimeConfig,
   url: string,
   payload: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<Response> {
   return fetch(url, {
     method: 'POST',
+    signal,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',

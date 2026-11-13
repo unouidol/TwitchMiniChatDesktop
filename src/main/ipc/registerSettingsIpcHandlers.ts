@@ -1,5 +1,4 @@
 ﻿import { app, ipcMain } from 'electron';
-import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import type { SetCurrentChannelRequest } from '../../shared/settings/TmcSettingsModels';
 import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
 import { TmcSettingsStore } from '../settings/TmcSettingsStore';
@@ -7,9 +6,7 @@ import { TmcSettingsStore } from '../settings/TmcSettingsStore';
 /**
  * Registers settings-related Inter-Process Communication handlers.
  */
-export function registerSettingsIpcHandlers(
-  _runtimeConfig: TmcRuntimeConfig,
-): void {
+export function registerSettingsIpcHandlers(): void {
   const settingsStore = new TmcSettingsStore(app.getPath('userData'));
 
   ipcMain.handle(TMC_IPC_CHANNELS.SETTINGS_GET, async () => {
