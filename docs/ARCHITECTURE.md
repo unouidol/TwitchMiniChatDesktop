@@ -115,6 +115,11 @@ npm run lint
 git diff --check
 ```
 
+`npm run lint` checks the existing TypeScript/TSX scope with zero warnings allowed
+(`--max-warnings 0`) and reports unused suppression directives as errors
+(`--report-unused-disable-directives`). It does not cover the CommonJS test
+scripts or establish that installation, runtime, and build tools are warning-free.
+
 `npm test` compiles the main-process composition to ignored `.test-build/` output
 and runs 16 account-removal regressions using Node's built-in test runner with
 experimental module mocking. The experimental warning remains visible. No new

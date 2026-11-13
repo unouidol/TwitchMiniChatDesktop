@@ -83,7 +83,7 @@ export async function registerIpcHandlers(
     accountRegistry,
     accountChannelStore,
   });
-  registerSettingsIpcHandlers(runtimeConfig);
+  registerSettingsIpcHandlers();
   registerBackendIpcHandlers(runtimeConfig, authSessionStore);
 }
 
