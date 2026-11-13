@@ -95,8 +95,9 @@ behavior; the ownership gaps below remain unresolved.
   Consolidation must update callers without assuming backend compatibility.
 - `npm test` covers account removal through the actual application composition,
   temporary persistent storage, and service recreation, with controlled external
-  substitutes. This standalone tree has no quality CI workflow; hosted execution
-  is unverified. The running application's account-removal smoke test
+  substitutes. `.github/workflows/quality.yml` configures Windows quality checks
+  with Node 24.18.0, `npm ci`, and separate test/typecheck/zero-warning lint steps.
+  Hosted execution is unverified. The running application's account-removal smoke test
   remains outstanding; live login, real Electron encryption, broader account
   switching, and PCG resource usage still need separate coverage.
 
@@ -114,6 +115,9 @@ npm run typecheck
 npm run lint
 git diff --check
 ```
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the workflow's permissions,
+action pins, reproduction steps, and distinction between local and hosted checks.
 
 `npm run lint` checks the existing TypeScript/TSX scope with zero warnings allowed
 (`--max-warnings 0`) and reports unused suppression directives as errors
