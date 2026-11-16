@@ -25,8 +25,6 @@ export function registerChatIpcHandlers(
   runtimeConfig: TmcRuntimeConfig,
   accountRegistry: TmcAccountSessionRegistry,
 ): TmcChatIpcController {
-  void runtimeConfig;
-
   let rendererSender: WebContents | null = null;
   const ircClient = new TmcTwitchIrcClient({
     onMessage: (message: TmcLiveChatMessage): void => {
@@ -43,7 +41,7 @@ export function registerChatIpcHandlers(
         status,
       );
     },
-  });
+  }, runtimeConfig.chatWebSocketUrl);
 
   ipcMain.handle(
     TMC_IPC_CHANNELS.CHAT_CONNECT_LIVE,

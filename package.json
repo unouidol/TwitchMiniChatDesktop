@@ -10,9 +10,10 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx . --max-warnings 0 --report-unused-disable-directives",
+    "lint": "eslint --ext .ts,.tsx,.mjs . --max-warnings 0 --report-unused-disable-directives",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --project tsconfig.test.json && node --experimental-test-module-mocks --test tests/*.test.cjs"
+    "test": "tsc --project tsconfig.test.json && node --experimental-test-module-mocks --test tests/*.test.cjs",
+    "test:e2e": "node tests/e2e/account-removal.mjs"
   },
   "keywords": [],
   "author": {
@@ -37,7 +38,9 @@
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "typescript": "~5.1.6",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "ws": "8.23.0",
+    "webdriverio": "9.31.9"
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1"
