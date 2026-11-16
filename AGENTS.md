@@ -42,7 +42,8 @@ These instructions apply to the entire Electron/TypeScript repository.
   Lint enforces zero warnings and unused-disable errors, but excludes CJS tests.
 - Run `npm run test:e2e` for the Windows synthetic Electron UI/restart scenario.
   Keep its marked temp profile and local-only transports isolated; it is not a
-  real-login or packaged-release test, and it is not part of CI.
+  real-login or packaged-release test. The separate Windows E2E job is configured;
+  its hosted execution still needs observation before claiming CI success.
 - Preserve temporary storage, synthetic sessions, HTTP substitutes, and the
   real-WebSocket guard. Do not launch authenticated services for automated tests.
   Add focused behavior coverage for auth, isolation, persistence, and lifecycle.

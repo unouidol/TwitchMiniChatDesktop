@@ -16,6 +16,12 @@ export async function verifyIntegrity(filename, expectedDigest) {
   return digest;
 }
 
+export async function exportDriverEnvironment(binaryPath, environmentFile) {
+  assert.ok(!/[\r\n]/.test(binaryPath), 'Driver path must fit one environment-file line');
+  await verifyIntegrity(binaryPath, provenance.binarySha256);
+  await fs.appendFile(environmentFile, `TMC_E2E_DRIVER_PATH=${binaryPath}\n`, 'utf8');
+}
+
 export function verifyDriverVersion(driverOutput) {
   assert.equal(driverOutput.match(/^ChromeDriver (\d+\.\d+\.\d+\.\d+)\b/)?.[1], provenance.driverVersion,
     'Unexpected ChromeDriver version');

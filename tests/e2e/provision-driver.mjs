@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { provenance, verifyIntegrity } from './driver.mjs';
+import { exportDriverEnvironment, provenance, verifyIntegrity } from './driver.mjs';
 
 assert.equal(process.platform, provenance.platform);
 assert.equal(process.arch, provenance.architecture);
@@ -23,6 +23,7 @@ execFileSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command',
 });
 const binary = path.join(extracted, 'chromedriver.exe');
 await verifyIntegrity(binary, provenance.binarySha256);
-await fs.writeFile(path.join(destination, 'provenance.json'), JSON.stringify(provenance, null, 2));
+await fs.writeFile(path.join(destination, 'provenance.json'), JSON.stringify({ ...provenance, binaryPath: binary }, null, 2));
+if (process.env.GITHUB_ENV) await exportDriverEnvironment(binary, process.env.GITHUB_ENV);
 console.log(`Verified official driver (not executed): ${binary}`);
 console.log('Set TMC_E2E_DRIVER_PATH explicitly to this path before npm run test:e2e.');

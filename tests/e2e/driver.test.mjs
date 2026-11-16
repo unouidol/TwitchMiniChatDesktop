@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { provenance, verifyIntegrity, verifyVersions } from './driver.mjs';
+import { exportDriverEnvironment, provenance, verifyIntegrity, verifyVersions } from './driver.mjs';
 
 const project = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -64,4 +64,25 @@ test('version gate rejects mismatched driver, Electron and Chromium before remot
 
 test('provisioned driver matches the independently authenticated archive-derived pin', async () => {
   assert.equal(await verifyIntegrity(process.env.TMC_E2E_DRIVER_PATH, provenance.binarySha256), provenance.binarySha256);
+});
+
+test('CI environment export preserves existing values and rejects unverified or multiline paths', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tmc-driver-export-'));
+  try {
+    const environmentFile = path.join(root, 'github-env');
+    await fs.writeFile(environmentFile, 'EXISTING=value\n');
+    const binary = process.env.TMC_E2E_DRIVER_PATH;
+    await exportDriverEnvironment(binary, environmentFile);
+    const expected = `EXISTING=value\nTMC_E2E_DRIVER_PATH=${binary}\n`;
+    assert.equal(await fs.readFile(environmentFile, 'utf8'), expected);
+    const invalid = path.join(root, 'invalid.exe');
+    await fs.writeFile(invalid, 'Not a verified driver');
+    await assert.rejects(exportDriverEnvironment(invalid, environmentFile), /integrity mismatch/);
+    await assert.rejects(exportDriverEnvironment(`${binary}\nINJECTED=value`, environmentFile), /one environment-file line/);
+    assert.equal(await fs.readFile(environmentFile, 'utf8'), expected);
+  } finally {
+    assert.equal(path.dirname(await fs.realpath(root)), await fs.realpath(os.tmpdir()));
+    assert.ok(path.basename(root).startsWith('tmc-driver-export-'));
+    await fs.rm(root, { recursive: true });
+  }
 });

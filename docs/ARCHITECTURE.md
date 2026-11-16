@@ -98,7 +98,8 @@ behavior; the ownership gaps below remain unresolved.
   substitutes. `.github/workflows/quality.yml` configures Windows quality checks
   with Node 24.18.0, `npm ci`, and separate test/typecheck/zero-warning lint steps.
   Baseline hosted execution passed for PR #1 at `ca9c0f2`; that result does not
-  cover later changes or the separate local E2E command. Real Twitch login,
+  cover later changes or the newly configured separate Windows E2E job, whose
+  hosted execution remains unobserved. Real Twitch login,
   protected packaging, broader account switching and PCG resources remain separate.
 
 These observations are a baseline, not a mandate to refactor them all in one task.
@@ -143,6 +144,14 @@ can select this endpoint. The bootstrap and fixture are outside normal startup.
 The local artifact is a Vite bundle, not a packaged release; all production fuse
 and window settings remain unchanged. See the contributor guide for cleanup,
 diagnostics, tool selection, network guards and coverage limitations.
+
+The separate `Windows Electron account-removal E2E` CI job now configures the same
+synthetic scenario and existing driver/guard/cleanup checks with Node 24.18.0.
+Provisioning exports only the integrity-verified explicit path through `GITHUB_ENV`;
+the workflow retains scoped diagnostic artifacts, not profiles, stores or binaries.
+Local command reproduction and a configured workflow do not establish a hosted
+pass. Neither this integration nor artifact collection changes production security,
+authentication, dependency-remediation status or PCG ownership.
 
 Manual account-removal validation remains deferred: with development accounts A
 and B, remove the currently selected account A, restart, and verify A is absent

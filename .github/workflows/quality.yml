@@ -41,3 +41,97 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+  electron-e2e:
+    name: Windows Electron account-removal E2E
+    runs-on: windows-2025
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.18.0'
+          package-manager-cache: false
+
+      - name: Record runtime
+        run: |
+          $nodeVersion = node --version
+          if ($LASTEXITCODE -ne 0 -or $nodeVersion -ne 'v24.18.0') { throw 'Unexpected Node runtime' }
+          $npmVersion = npm --version
+          if ($LASTEXITCODE -ne 0 -or $npmVersion -ne '11.16.0') { throw 'Unexpected bundled npm' }
+          Write-Output "Node $nodeVersion; npm $npmVersion"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Provision checksum-verified ChromeDriver
+        run: node tests/e2e/provision-driver.mjs
+
+      - name: Verify driver and fail-closed configuration
+        run: |
+          New-Item -ItemType Directory -Force .test-build/electron-e2e/ci-logs | Out-Null
+          node --test tests/e2e/driver.test.mjs 2>&1 | Tee-Object -FilePath .test-build/electron-e2e/ci-logs/driver-checks.log
+          $testExit = $LASTEXITCODE
+          $root = (Resolve-Path -LiteralPath '.test-build/electron-e2e').Path
+          $destination = Join-Path $root 'driver-check-evidence'
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          foreach ($directory in Get-ChildItem -LiteralPath $root -Directory -Filter 'evidence-*') {
+            $owned = (Resolve-Path -LiteralPath $directory.FullName).Path
+            if ((Split-Path -Parent $owned) -ne $root) { throw 'Unexpected driver-check evidence path' }
+            Move-Item -LiteralPath $owned -Destination $destination
+          }
+          exit $testExit
+
+      - name: Verify local application network guards
+        run: |
+          node --test tests/e2e/network-guards.test.mjs 2>&1 | Tee-Object -FilePath .test-build/electron-e2e/ci-logs/network-guard-checks.log
+          exit $LASTEXITCODE
+
+      - name: Verify failure-resilient cleanup
+        run: |
+          node --test tests/e2e/finalize.test.mjs 2>&1 | Tee-Object -FilePath .test-build/electron-e2e/ci-logs/cleanup-regressions.log
+          exit $LASTEXITCODE
+
+      - name: Remove saved account through Electron UI and restart
+        run: |
+          npm run test:e2e 2>&1 | Tee-Object -FilePath .test-build/electron-e2e/ci-logs/removal-restart.log
+          exit $LASTEXITCODE
+
+      - name: Retain scoped E2E diagnostics
+        if: ${{ always() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-electron-e2e-diagnostics
+          retention-days: 7
+          if-no-files-found: warn
+          include-hidden-files: true
+          path: |
+            .test-build/electron-e2e/ci-logs/*.log
+            .test-build/electron-e2e/driver-check-evidence/evidence-*/failure.txt
+            .test-build/electron-e2e/driver-check-evidence/evidence-*/bootstrap-failure.txt
+            .test-build/electron-e2e/driver-check-evidence/evidence-*/driver-traffic.json
+            .test-build/electron-e2e/driver-check-evidence/evidence-*/finalization.json
+            .test-build/electron-e2e/guard-probe-*/network.json
+            .test-build/electron-e2e/guard-probe-*/probe-result.json
+            .test-build/electron-e2e/guard-probe-*/process.log
+            .test-build/electron-e2e/evidence-*/first.json
+            .test-build/electron-e2e/evidence-*/restart.json
+            .test-build/electron-e2e/evidence-*/*-network.json
+            .test-build/electron-e2e/evidence-*/*-driver-verification.json
+            .test-build/electron-e2e/evidence-*/driver-traffic.json
+            .test-build/electron-e2e/evidence-*/finalization.json
+            .test-build/electron-e2e/evidence-*/result.json
+            .test-build/electron-e2e/evidence-*/failure.txt
+            .test-build/electron-e2e/evidence-*/bootstrap-failure.txt
+            .test-build/electron-e2e/evidence-*/failure.png
+            .test-build/electron-e2e/evidence-*/*-driver.log
+            .test-build/electron-e2e/evidence-*/*-electron.log

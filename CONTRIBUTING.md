@@ -45,7 +45,7 @@ part of this quality workflow and does not establish correct authentication.
 ## Continuous integration
 
 [The quality workflow](.github/workflows/quality.yml) runs on pull requests,
-pushes to the verified default branch `main`, and manual dispatch. Its single
+pushes to the verified default branch `main`, and manual dispatch. The existing
 `Windows quality checks` job uses `windows-2025`, Node 24.18.0, `npm ci`, and
 separate test/typecheck/lint steps. A failing check fails the job; later steps
 may be skipped. Runs time out after 20 minutes and superseded runs for the same
@@ -66,8 +66,9 @@ The selected hosted Windows image is documented by
 Local validation does not execute that hosted environment.
 
 The baseline workflow passed on [draft PR #1](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/43496736663)
-for head `ca9c0f22c9335a901fcae5759550f307eae50f81`. This does not verify later
-uncommitted changes or the separate Electron E2E command, which is not in CI.
+for head `ca9c0f22c9335a901fcae5759550f307eae50f81`. This does not verify
+later changes or the newly configured Electron E2E job, whose hosted execution
+has not yet been observed.
 After a successful hosted run, the maintainer may separately configure required
 checks. Defining a workflow does not configure branch protection.
 
@@ -94,7 +95,7 @@ On Windows x64 with Node 24.18.0 and PowerShell 7, install dependencies with
 `npm ci`, provision the driver as described below, then run `npm run test:e2e`.
 Run serially; generated bundles and sanitized evidence live
 under ignored `.test-build/electron-e2e/`. This command is intentionally separate
-from `npm test` and the CI workflow. Maintained E2E `.mjs` and `.ts` files receive
+from `npm test` and runs in its own CI job. Maintained E2E `.mjs` and `.ts` files receive
 Node-specific ESLint coverage, with no diagnostic suppressions.
 
 The scenario seeds synthetic B/A through the production secure store, selects A
@@ -114,7 +115,9 @@ are unchanged. This does not establish packaged-app behavior or full startup par
 Dependencies: `webdriverio` 9.31.9 (WebDriver client/driver lifecycle, Node
 >=18.20.0) and `ws` 8.23.0 (loopback IRC fixture). Electron remains 43.0.0;
 ChromeDriver 150.0.7871.46 matches the actual Electron Chromium version.
-No scaffolding wizard, new unit runner, or browser download is needed.
+No scaffolding wizard or new unit runner is needed. Dependency/runtime setup may
+download Electron from official distribution services; WDIO automatic acquisition
+is bypassed by the explicit binaries.
 
 ### Explicit verified ChromeDriver
 
@@ -140,6 +143,57 @@ Do not substitute an unverified cached driver or change pins to match local file
 Provisioned archives/binaries and provenance copies stay under ignored
 `.test-build/electron-e2e/provisioned-driver-*`; do not commit them or local paths.
 Failed provisioning leaves artifacts for diagnosis and never runs the driver.
+
+On GitHub Actions, the provisioning utility also writes the verified absolute
+binary path to the runner's UTF-8 `GITHUB_ENV` file as `TMC_E2E_DRIVER_PATH`, only
+after the pinned SHA-256 check succeeds. It rejects multiline paths; no workflow
+step parses human console output or searches a shared cache. The generated
+`provenance.json` records `binaryPath` alongside the source and digest, but is not
+uploaded. Locally, keep using the explicit path above unless deliberately testing
+the [GitHub environment-file protocol](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-environment-variable).
+
+### Windows E2E CI job
+
+`Windows Electron account-removal E2E` is a separate `windows-2025` job with a
+25-minute timeout, pinned Node 24.18.0 and bundled npm. It retains inherited
+read-only repository permissions, nonpersistent checkout credentials and disabled
+package-manager caching. The original `Windows quality checks` job is unchanged.
+Named steps record versions, run `npm ci`, provision the official checksum-pinned
+driver, run driver checks, network-guard probes, cleanup regressions, and one full
+UI-removal/restart scenario. Failures propagate unchanged; there is no scenario
+retry, `continue-on-error`, secret, OTP, `local.properties` or privileged PR trigger.
+
+The artifact step runs even after failure, with a five-minute limit and seven-day
+retention. [upload-artifact v7.0.2](https://github.com/actions/upload-artifact/tree/cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+uses a verified immutable official commit and Node 24. Its path list allows only
+named diagnostic reports, logs and failure screenshots. Hidden-file inclusion is
+needed for `.test-build`, not a grant to upload that entire directory. Profiles,
+credential stores, provisioned binaries/archives/metadata, bundles, dependencies
+and unrelated files are excluded by the positive allowlist. Missing artifacts
+warn when an earlier setup failure prevented their creation; that failure still
+fails the job. A failed artifact upload also fails the job.
+
+Driver-negative evidence moves into `driver-check-evidence` after that step while
+retaining its native test exit code. Expected network rejections retain the
+`guard-probe-*` prefix and `expectedFailure` reports. Step logs name driver checks,
+network guards, cleanup regressions and actual removal separately: fault-test
+messages are not proof of a failed removal scenario. Only synthetic accounts and
+local fixtures run; application guards and WDIO parent evidence remain distinct,
+not OS-wide network isolation or dependency remediation.
+
+To reproduce the command sequence locally, use the setup commands above with
+Node 24.18.0/npm 11.16.0 and a fresh test-owned profile (the launcher creates one).
+For exact workflow replay, give provisioning a disposable `GITHUB_ENV` file, load
+its `TMC_E2E_DRIVER_PATH` assignment into subsequent steps and preserve each native
+exit code when teeing logs. Use an isolated copy for a fresh `npm ci`; never replace
+another developer's installation. Local reproduction is not hosted execution.
+On 2026-11-16, the workflow's run-step bodies were reproduced once in an isolated
+Windows copy using Node 24.18.0/npm 11.16.0, including fresh `npm ci`, official
+provisioning and environment-file handoff: driver 4/4, network guards 4/4,
+cleanup 9/9 and one full real-Electron restart passed. Typecheck, zero-warning
+lint, workflow validation and local artifact-selection checks also passed.
+The upload action itself was not run locally. The job is configured but its
+first GitHub-hosted result remains outstanding; earlier baseline CI is not that result.
 
 The launcher requires the explicit absolute path and verifies its regular-file
 status and SHA-256 **before** executing `--version`. It checks the pinned driver
