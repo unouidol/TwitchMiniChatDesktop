@@ -97,9 +97,21 @@ behavior; the ownership gaps below remain unresolved.
   temporary persistent storage, and service recreation, with controlled external
   substitutes. `.github/workflows/quality.yml` configures Windows quality checks
   with Node 24.18.0, `npm ci`, and separate test/typecheck/zero-warning lint steps.
-  Hosted execution is unverified. The running application's account-removal smoke test
-  remains outstanding; live login, real Electron encryption, broader account
-  switching, and PCG resource usage still need separate coverage.
+  Baseline hosted execution passed for PR #1 at `ca9c0f2`; that result does not
+  cover later changes. The first separate Windows E2E run failed during driver
+  negatives because raw short TEMP paths disagreed with canonical cleanup paths;
+  guard/cleanup/scenario steps were skipped. Canonical creation now preserves
+  strict cleanup identity checks. The next hosted run at `4a0ee1c` passed driver
+  checks but failed during Electron guard bootstrap: non-native synchronous
+  realpath retained a short TEMP ancestor. Electron now uses `realpathSync.native`
+  for profile and parent checks; the guard suite exercises a real short-TEMP child
+  process. Hosted run
+  [44054285201](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/44054285201)
+  passed quality checks, driver 4/4, guards 5/5, cleanup 12/12 and the full
+  synthetic UI/restart scenario at `01ee0be`, with native short-TEMP checks not
+  skipped and the owned profile removed. Later changes need their own evidence.
+  Real Twitch login,
+  protected packaging, broader account switching and PCG resources remain separate.
 
 These observations are a baseline, not a mandate to refactor them all in one task.
 Update or remove each entry when the corresponding change is verified.
@@ -119,7 +131,7 @@ git diff --check
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the workflow's permissions,
 action pins, reproduction steps, and distinction between local and hosted checks.
 
-`npm run lint` checks the existing TypeScript/TSX scope with zero warnings allowed
+`npm run lint` checks TypeScript/TSX and MJS with zero warnings allowed
 (`--max-warnings 0`) and reports unused suppression directives as errors
 (`--report-unused-disable-directives`). It does not cover the CommonJS test
 scripts or establish that installation, runtime, and build tools are warning-free.
@@ -130,8 +142,27 @@ experimental module mocking. The experimental warning remains visible. No new
 dependency is needed. HTTP is substituted and unexpected real WebSocket
 construction is blocked; tests use temporary stores and synthetic credentials.
 No Twitch account, backend credentials, or `local.properties` is required.
-Installation can contact package/download services. No test verifies real
-Electron encryption, the running renderer, or provider authentication.
+Installation can contact package/download services. This mocked unit suite does
+not verify real Electron encryption, the running renderer, or provider authentication.
+
+`npm run test:e2e` adds one Windows-only, synthetic scenario using real Electron,
+the production renderer/preload/IPC/removal service and OS-backed safeStorage.
+Its separate bootstrap isolates user/session paths before importing production
+services, rejects real runtime configuration imports, and supplies loopback
+backend/IRC transports. The IRC endpoint is an explicit main-process configuration
+dependency; when omitted, production retains its original Twitch URL. No renderer
+can select this endpoint. The bootstrap and fixture are outside normal startup.
+The local artifact is a Vite bundle, not a packaged release; all production fuse
+and window settings remain unchanged. See the contributor guide for cleanup,
+diagnostics, tool selection, network guards and coverage limitations.
+
+The separate `Windows Electron account-removal E2E` CI job now configures the same
+synthetic scenario and existing driver/guard/cleanup checks with Node 24.18.0.
+Provisioning exports only the integrity-verified explicit path through `GITHUB_ENV`;
+the workflow retains scoped diagnostic artifacts, not profiles, stores or binaries.
+Local command reproduction and a configured workflow do not establish a hosted
+pass. Neither this integration nor artifact collection changes production security,
+authentication, dependency-remediation status or PCG ownership.
 
 Manual account-removal validation remains deferred: with development accounts A
 and B, remove the currently selected account A, restart, and verify A is absent

@@ -12,5 +12,12 @@
     "plugin:import/electron",
     "plugin:import/typescript"
   ],
-  "parser": "@typescript-eslint/parser"
+  "parser": "@typescript-eslint/parser",
+  "overrides": [
+    {
+      "files": ["tests/e2e/*.mjs", "tests/e2e/*.ts"],
+      "env": { "browser": false, "node": true, "es2022": true },
+      "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" }
+    }
+  ]
 }

@@ -4,6 +4,7 @@ import { readLocalPropertiesFromProjectRoot } from './LocalPropertiesReader';
  * Runtime configuration used by the Electron main process.
  */
 export type TmcRuntimeConfig = {
+  readonly chatWebSocketUrl?: string;
   /**
    * Base URL of the TMC backend.
    */

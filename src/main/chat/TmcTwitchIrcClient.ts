@@ -80,7 +80,10 @@ export class TmcTwitchIrcClient {
   /**
    * Creates a Twitch IRC client.
    */
-  constructor(callbacks: TmcTwitchIrcClientCallbacks = {}) {
+  constructor(
+    callbacks: TmcTwitchIrcClientCallbacks = {},
+    private readonly webSocketUrl = TWITCH_IRC_WEBSOCKET_URL,
+  ) {
     this.onMessage = callbacks.onMessage;
     this.onStatusChanged = callbacks.onStatusChanged;
   }
@@ -106,7 +109,7 @@ export class TmcTwitchIrcClient {
     this.username = username;
     this.updateStatus('connecting', channel, `Connecting to #${channel}...`);
 
-    const socket = new WebSocket(TWITCH_IRC_WEBSOCKET_URL);
+    const socket = new WebSocket(this.webSocketUrl);
     this.socket = socket;
 
     socket.onopen = (): void => {

@@ -1,0 +1,13 @@
+{
+  "electronVersion": "43.0.0",
+  "chromiumVersion": "150.0.7871.46",
+  "driverVersion": "150.0.7871.46",
+  "platform": "win32",
+  "architecture": "x64",
+  "sourceUrl": "https://github.com/electron/electron/releases/download/v43.0.0/chromedriver-v43.0.0-win32-x64.zip",
+  "checksumUrl": "https://github.com/electron/electron/releases/download/v43.0.0/SHASUMS256.txt",
+  "releaseMetadataUrl": "https://api.github.com/repos/electron/electron/releases/tags/v43.0.0",
+  "archiveSha256": "9dade004c9f224a0102af500fb5bb626cb4b2f6cbcbabef12396420a04a1e0e4",
+  "binarySha256": "ee1dde16d01320df08d0ce04df6094dd4c8f81f2d9ab2fee95b283ee18f7e574",
+  "binaryDigestProvenance": "SHA-256 of chromedriver.exe extracted by Windows Expand-Archive only after archive verification against the official release SHASUMS256.txt and matching GitHub asset digest on 2026-11-14; not a checksum of an arbitrary cached binary."
+}
