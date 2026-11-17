@@ -2,10 +2,12 @@
 
 import type {
   FinalizeTwitchLoginRequest,
+  FinalizeTwitchLoginResult,
   StartTwitchLoginRequest,
 } from '../../shared/auth/TmcAuthModels';
 import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
 import type { TmcAccountSessionRegistry } from '../accounts/TmcAccountSessionRegistry';
+import { syncAuthSessionStore } from '../accounts/TmcAccountRemovalService';
 import { TmcAuthBrokerClient } from '../auth/TmcAuthBrokerClient';
 import type { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
 import type { TmcSecureAuthSessionStore } from '../auth/TmcSecureAuthSessionStore';
@@ -47,20 +49,34 @@ export function registerAuthIpcHandlers(
     async (
       _event,
       request: FinalizeTwitchLoginRequest | string | undefined,
-    ) => {
+    ): Promise<FinalizeTwitchLoginResult> => {
       const loginToken = readLoginTokenFromFinalizeRequest(request);
 
-      const result = await authBrokerClient.finalizeLoginToken(loginToken);
-      const session = authSessionStore.getSession();
+      const session = await authBrokerClient.finalizeLoginToken(loginToken);
 
       if (!session?.desktopSessionToken) {
         throw new Error('Desktop session unavailable. Please sign in again.');
       }
 
-      await secureAuthSessionStore.saveSession(session);
+      try {
+        await secureAuthSessionStore.saveSession(session);
+      } catch (cause) {
+        // Electron can log thrown IPC errors including their causes. Never attach decrypted content.
+        const safeCause = cause instanceof SyntaxError
+          ? new SyntaxError('Saved authentication format is invalid.')
+          : new Error('Encrypted authentication persistence failed.');
+        throw new Error('Saved authentication could not be updated. Existing saved data was retained.', { cause: safeCause });
+      }
       await accountRegistry.addOrUpdateSession(session);
+      syncAuthSessionStore(authSessionStore, accountRegistry);
 
-      return result;
+      return {
+        success: true,
+        profileId: session.profileId,
+        username: session.username,
+        userId: session.userId,
+        message: `Logged in as ${session.username}.`,
+      };
     },
   );
 }
