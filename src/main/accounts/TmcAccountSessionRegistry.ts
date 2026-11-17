@@ -23,12 +23,11 @@ export class TmcAccountSessionRegistry {
   ) {}
 
   /**
-   * Loads account metadata and remembers the preferred active profile.
+   * Loads metadata and keeps the preference unresolved until startup restore completes.
    */
   async initialize(): Promise<void> {
     this.replaceAccounts(await this.accountStore.loadAccounts());
     this.activeProfileId = await this.activeAccountStore.loadActiveProfileId();
-    await this.ensureActiveAccount();
   }
 
   /**
@@ -56,7 +55,10 @@ export class TmcAccountSessionRegistry {
     }
 
     await this.persistAccountsSafely();
-    await this.ensureActiveAccount();
+    // Restore callers resolve selection once the complete batch is available.
+    if (makeActive) {
+      await this.ensureActiveAccount();
+    }
 
     return this.getActiveAccountResult();
   }

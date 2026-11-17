@@ -83,6 +83,13 @@ void app.whenReady().then(async () => {
   const saved = await store.loadSessions();
   assert.deepEqual(saved.map((entry) => entry.profileId).sort(), phase === 'first' ? ['A', 'B'] : ['B']);
   for (const entry of saved) assert.equal(entry.desktopSessionToken, `synthetic-desktop-${entry.profileId}`);
+  let startupPreferredProfileId: string | undefined;
+  if (phase === 'first') {
+    // Select the account restored last, independently of timestamp ties during seeding.
+    startupPreferredProfileId = saved[saved.length - 1].profileId;
+    const { TmcActiveAccountStore } = await import('../../src/main/accounts/TmcActiveAccountStore');
+    await new TmcActiveAccountStore().saveActiveProfileId(startupPreferredProfileId);
+  }
   const { registerIpcHandlers } = await import('../../src/main/ipc/registerIpcHandlers');
   const { createMainWindow } = await import('../../src/main/windows/createMainWindow');
   await registerIpcHandlers({
@@ -111,6 +118,7 @@ void app.whenReady().then(async () => {
     pid: process.pid,
     profile: app.getPath('userData'),
     savedProfiles: saved.map((entry) => entry.profileId).sort(),
+    startupPreferredProfileId,
     encryptionAvailable: true,
     versions: { electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node },
     rendererSurface,
