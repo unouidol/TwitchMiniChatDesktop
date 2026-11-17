@@ -3,7 +3,7 @@ import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import { TmcAccountSessionRegistry } from '../accounts/TmcAccountSessionRegistry';
 import { TmcAccountStore } from '../accounts/TmcAccountStore';
 import { TmcActiveAccountStore } from '../accounts/TmcActiveAccountStore';
-import { TmcAuthBrokerClient } from '../auth/TmcAuthBrokerClient';
+import { TmcAuthBrokerClient, TmcDesktopSessionRestoreError } from '../auth/TmcAuthBrokerClient';
 import { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
 import { TmcAccountChannelStore } from '../channels/TmcAccountChannelStore';
 import {
@@ -93,7 +93,13 @@ async function restoreSavedDesktopSessions(
   secureAuthSessionStore: TmcSecureAuthSessionStore,
   accountRegistry: TmcAccountSessionRegistry,
 ): Promise<void> {
-  const savedSessions = await secureAuthSessionStore.loadSessions();
+  let savedSessions: readonly TmcSecureDesktopAuthSession[];
+  try {
+    savedSessions = await secureAuthSessionStore.loadSessions();
+  } catch {
+    console.warn('[TMC Auth] Saved authentication could not be read; stored data retained.');
+    return;
+  }
   const authBrokerClient = new TmcAuthBrokerClient(
     runtimeConfig,
     authSessionStore,
@@ -120,16 +126,21 @@ async function restoreOneDesktopSession(
       savedSession.desktopSessionToken,
     );
 
+    if (restoredSession.profileId !== savedSession.profileId ||
+      restoredSession.userId !== savedSession.userId) {
+      throw new TmcDesktopSessionRestoreError('identity-mismatch');
+    }
+    try {
+      await secureAuthSessionStore.saveSession(restoredSession);
+    } catch {
+      console.warn('[TMC Auth] Restored authentication could not be saved; account not activated and stored data retained.');
+      return;
+    }
     await accountRegistry.addOrUpdateSession(restoredSession, {
       makeActive: false,
     });
-
-    if (restoredSession.desktopSessionToken) {
-      await secureAuthSessionStore.saveSession(restoredSession);
-    }
-  } catch {
-    await secureAuthSessionStore.deleteSession(savedSession.profileId);
-    await accountRegistry.removeAccount(savedSession.profileId);
-    console.warn('[TMC Auth] Saved desktop session could not be restored.');
+  } catch (error) {
+    const reason = error instanceof TmcDesktopSessionRestoreError ? error.reason : 'unavailable';
+    console.warn(`[TMC Auth] Saved desktop session was not restored (${reason}); saved authentication retained.`);
   }
 }

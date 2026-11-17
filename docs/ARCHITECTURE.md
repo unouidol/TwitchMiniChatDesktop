@@ -47,10 +47,29 @@ removed; removing another saved account leaves the selected account's chat alone
 The registry selects a remaining account or becomes signed out, and the
 compatibility authentication store mirrors that result. Backend logout uses only
 the removed session's token and is best effort: failure does not undo local
-removal. Only logout has a ten-second HTTP timeout; session restoration is unchanged.
+removal. Logout and each session-restore request have a ten-second HTTP timeout,
+including response-body consumption.
 A late logout completion does not change the subsequently selected account.
 Save/delete operations on the application's secure-store instance are serialized
 to avoid overlapping read-modify-write operations restoring removed credentials.
+
+Restore failures preserve saved authentication and leave that account inactive
+for this run. Network/timeout/HTTP errors, malformed responses and profile/user
+identity mismatches do not delete credentials or prevent another account from
+restoring. The broker returns data without selecting an account; the initiating
+profile and user identifiers must match before saving and activating it.
+HTTP 401/403 is classified as a rejected restore, but is not deletion authority:
+the backend's definitive revocation contract is not available in this repository.
+Explicit removal remains the deletion path. A later restart retries saved credentials.
+
+A valid restore is saved before activation; local save failure preserves the
+previous file and leaves the account inactive. Server-side token rotation followed
+by a local save failure cannot guarantee the old token remains accepted by the
+provider. Storage read/decryption/schema failures preserve the file and allow
+startup to continue signed out; a later login cannot silently replace an unreadable store.
+Finalizing a new login likewise saves and registers the session before selecting
+it. Failed persistence leaves the previous account active (or remains signed out)
+and exposes a fixed storage-error message, not decrypted content, to the renderer.
 
 ## Chat and account state
 
@@ -85,10 +104,9 @@ behavior; the ownership gaps below remain unresolved.
 
 ## Known gaps to address incrementally
 
-- Restore errors currently remove saved sessions without classifying temporary
-  network errors separately from invalid credentials.
-- Restores run before window creation, sequentially, without an explicit OAuth
-  request timeout. Offline startup needs deliberate behavior.
+- Restores still run sequentially before window creation. The timeout is ten seconds
+  per request, not a global startup deadline; there is no automatic retry in the
+  same run. Offline-account/retry and storage repair/recovery UI remain separate work.
 - Real PCG views and hold metadata have separate owners. Replacement detaches
   the old view without an explicit close in that path; verify and fix disposal.
 - Preload and renderer bridge types duplicate the contract and retain aliases.
@@ -137,9 +155,9 @@ action pins, reproduction steps, and distinction between local and hosted checks
 scripts or establish that installation, runtime, and build tools are warning-free.
 
 `npm test` compiles the main-process composition to ignored `.test-build/` output
-and runs 16 account-removal regressions using Node's built-in test runner with
+and runs account-removal and session-restore regressions using Node's built-in test runner with
 experimental module mocking. The experimental warning remains visible. No new
-dependency is needed. HTTP is substituted and unexpected real WebSocket
+dependency is needed. HTTP is substituted or served by a loopback fixture; unexpected real WebSocket
 construction is blocked; tests use temporary stores and synthetic credentials.
 No Twitch account, backend credentials, or `local.properties` is required.
 Installation can contact package/download services. This mocked unit suite does

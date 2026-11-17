@@ -23,7 +23,7 @@ For clean-install experiments, use an isolated checkout/copy rather than replaci
 another developer's `node_modules` or working files.
 
 `npm test` compiles the main-process composition to ignored `.test-build/` and
-runs 16 account-removal regressions with Node's built-in test runner. Tests use
+runs account-removal and session-restore regressions with Node's built-in test runner. Tests use
 temporary storage, synthetic credentials, Electron/encryption/IRC substitutes,
 mocked HTTP, and a guard against real WebSocket construction. Preserve those
 boundaries; never contact Twitch/backend services in behavior tests.
@@ -35,6 +35,17 @@ its cause. CommonJS `.cjs` test scripts are not yet covered by this lint scope.
 Zero ESLint warnings does not mean the entire toolchain is warning-free.
 Node's experimental module-mocking warning remains visible and unresolved;
 evaluate a stable testing approach separately, without suppressing diagnostics.
+
+Session-restore regressions cover offline/HTTP failures followed by a successful
+restart, mixed account outcomes, response identity/schema validation, rotated
+tokens, bounded requests and local read/decrypt/write failures. A loopback HTTP
+fixture also verifies that aborting after response headers interrupts body
+consumption. Failed accounts are not activated; their encrypted credentials are
+retained and retried on a later restart. Even 401/403 does not delete stored
+authentication without a documented backend revocation contract. No retry UI,
+automatic retry, live provider request or offline authentication is introduced.
+Unreadable encrypted storage is retained and cannot be silently overwritten by
+a later login; repair/recovery UI is separate work.
 
 `npm start` launches the application and can restore authenticated state; it is
 not an automated check. Backend/OAuth setup needs suitable development

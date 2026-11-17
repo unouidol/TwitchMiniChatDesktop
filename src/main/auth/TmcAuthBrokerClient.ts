@@ -1,6 +1,5 @@
 import { shell } from 'electron';
 import type {
-  FinalizeTwitchLoginResult,
   StartTwitchLoginRequest,
   StartTwitchLoginResult,
   TmcAuthStatus,
@@ -25,6 +24,17 @@ type RawOAuthFinalizeResponse = {
  * Desktop OAuth uses a manual claim-code page instead of a custom protocol.
  */
 const DESKTOP_CLAIM_RETURN_SCHEME = 'desktop-claim';
+
+export class TmcDesktopSessionRestoreError extends Error {
+  constructor(
+    readonly reason: 'unavailable' | 'rejected' | 'invalid-response' | 'identity-mismatch',
+    readonly status?: number,
+    options?: ErrorOptions,
+  ) {
+    super('Desktop session could not be restored.', options);
+    this.name = 'TmcDesktopSessionRestoreError';
+  }
+}
 
 /**
  * Starts, finalizes, and restores the TMC Desktop authentication flow.
@@ -86,7 +96,7 @@ export class TmcAuthBrokerClient {
    */
   async finalizeLoginToken(
     loginToken: string,
-  ): Promise<FinalizeTwitchLoginResult> {
+  ): Promise<TmcAuthSession> {
     const response = await postOAuthJson(this.config, this.config.oauthFinalizeUrl, {
       login_token: loginToken,
     });
@@ -104,38 +114,40 @@ export class TmcAuthBrokerClient {
       );
     }
 
-    this.sessionStore.setSession(session);
-
-    return {
-      success: true,
-      profileId: session.profileId,
-      username: session.username,
-      userId: session.userId,
-      message: `Logged in as ${session.username}.`,
-    };
+    return session;
   }
 
   /**
    * Restores a durable desktop auth session and obtains a fresh access token.
    */
   async restoreDesktopSession(desktopSessionToken: string): Promise<TmcAuthSession> {
-    const response = await postOAuthJson(
-      this.config,
-      this.config.oauthDesktopRestoreUrl,
-      {
-        desktop_session_token: desktopSessionToken,
-      },
-    );
-    const rawJson = (await response.json()) as RawOAuthFinalizeResponse;
-
-    if (!response.ok) {
-      throw new Error(readString(rawJson.error) || 'Desktop session restore failed.');
+    const signal = AbortSignal.timeout(10_000);
+    try {
+      const response = await postOAuthJson(
+        this.config,
+        this.config.oauthDesktopRestoreUrl,
+        { desktop_session_token: desktopSessionToken },
+        signal,
+      );
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new TmcDesktopSessionRestoreError(
+          response.status === 401 || response.status === 403 ? 'rejected' : 'unavailable',
+          response.status,
+        );
+      }
+      try {
+        const rawJson: unknown = await response.json();
+        return normalizeFinalizeResponse(rawJson, desktopSessionToken);
+      } catch (cause) {
+        throw new TmcDesktopSessionRestoreError(
+          signal.aborted ? 'unavailable' : 'invalid-response', response.status, { cause },
+        );
+      }
+    } catch (cause) {
+      if (cause instanceof TmcDesktopSessionRestoreError) throw cause;
+      throw new TmcDesktopSessionRestoreError('unavailable', undefined, { cause });
     }
-
-    const session = normalizeFinalizeResponse(rawJson, desktopSessionToken);
-    this.sessionStore.setSession(session);
-
-    return session;
   }
 
   /**
@@ -271,15 +283,18 @@ function buildUserAgent(config: TmcRuntimeConfig): string {
  * Converts the raw finalize/restore response into an in-memory auth session.
  */
 function normalizeFinalizeResponse(
-  rawJson: RawOAuthFinalizeResponse,
+  rawJson: unknown,
   fallbackDesktopSessionToken?: string,
 ): TmcAuthSession {
-  const profileId = readString(rawJson.profile_id);
-  const username = readString(rawJson.username);
-  const userId = readString(rawJson.user_id);
-  const accessToken = readString(rawJson.access_token);
+  if (!rawJson || typeof rawJson !== 'object') {
+    throw new Error('OAuth response must be an object.');
+  }
+  const profileId = readString('profile_id' in rawJson ? rawJson.profile_id : undefined);
+  const username = readString('username' in rawJson ? rawJson.username : undefined);
+  const userId = readString('user_id' in rawJson ? rawJson.user_id : undefined);
+  const accessToken = readString('access_token' in rawJson ? rawJson.access_token : undefined);
   const desktopSessionToken =
-    readString(rawJson.desktop_session_token) || fallbackDesktopSessionToken;
+    readString('desktop_session_token' in rawJson ? rawJson.desktop_session_token : undefined) || fallbackDesktopSessionToken;
 
   if (!profileId || !username || !userId || !accessToken) {
     throw new Error('OAuth response is missing required fields.');

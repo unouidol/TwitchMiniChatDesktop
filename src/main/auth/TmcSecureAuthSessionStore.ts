@@ -135,15 +135,10 @@ export class TmcSecureAuthSessionStore {
   }
 
   /**
-   * Loads all durable desktop auth sessions, returning an empty list on failure.
+   * Loads durable sessions; read/decryption failures preserve the file and reject.
    */
   async loadSessions(): Promise<readonly TmcSecureDesktopAuthSession[]> {
-    try {
-      return await this.readSessions();
-    } catch {
-      await this.clearSessionsSafely();
-      return [];
-    }
+    return this.readSessions();
   }
 
   private async readSessions(): Promise<readonly TmcSecureDesktopAuthSession[]> {
@@ -281,14 +276,6 @@ export class TmcSecureAuthSessionStore {
       await this.saveSessions(sessions);
     } catch {
       // Re-encryption is opportunistic; valid restored sessions can stay in memory.
-    }
-  }
-
-  private async clearSessionsSafely(): Promise<void> {
-    try {
-      await this.clearSessions();
-    } catch {
-      // Corrupt or inaccessible persisted auth should not block startup.
     }
   }
 
