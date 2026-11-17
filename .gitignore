@@ -87,6 +87,7 @@ typings/
 
 # Vite
 .vite/
+.test-build/
 
 # Electron-Forge
 out/

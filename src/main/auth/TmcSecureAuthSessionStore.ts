@@ -90,6 +90,8 @@ type SafeStorageWithAsync = typeof safeStorage & {
  * calls can use the encrypted desktop session token to obtain fresh access.
  */
 export class TmcSecureAuthSessionStore {
+  private mutationQueue: Promise<void> = Promise.resolve();
+
   /**
    * Creates the encrypted auth session store.
    */
@@ -108,26 +110,28 @@ export class TmcSecureAuthSessionStore {
    * Saves or updates one durable desktop auth session encrypted at rest.
    */
   async saveSession(session: TmcAuthSession): Promise<void> {
-    if (!session.desktopSessionToken) {
-      throw new Error('Desktop session token is required for durable auth save.');
-    }
+    return this.enqueueMutation(async () => {
+      if (!session.desktopSessionToken) {
+        throw new Error('Desktop session token is required for durable auth save.');
+      }
 
-    const existingSessions = await this.loadSessions();
-    const nextSession: TmcSecureDesktopAuthSession = {
-      profileId: session.profileId,
-      username: session.username,
-      userId: session.userId,
-      desktopSessionToken: session.desktopSessionToken,
-      savedAt: Date.now(),
-    };
-    const mergedSessions = new Map<string, TmcSecureDesktopAuthSession>();
+      const existingSessions = await this.loadSessions();
+      const nextSession: TmcSecureDesktopAuthSession = {
+        profileId: session.profileId,
+        username: session.username,
+        userId: session.userId,
+        desktopSessionToken: session.desktopSessionToken,
+        savedAt: Date.now(),
+      };
+      const mergedSessions = new Map<string, TmcSecureDesktopAuthSession>();
 
-    for (const existingSession of existingSessions) {
-      mergedSessions.set(existingSession.profileId, existingSession);
-    }
+      for (const existingSession of existingSessions) {
+        mergedSessions.set(existingSession.profileId, existingSession);
+      }
 
-    mergedSessions.set(nextSession.profileId, nextSession);
-    await this.saveSessions(Array.from(mergedSessions.values()));
+      mergedSessions.set(nextSession.profileId, nextSession);
+      await this.saveSessions(Array.from(mergedSessions.values()));
+    });
   }
 
   /**
@@ -135,28 +139,32 @@ export class TmcSecureAuthSessionStore {
    */
   async loadSessions(): Promise<readonly TmcSecureDesktopAuthSession[]> {
     try {
-      const persistedValue = await readPersistedSessions(this.filePath);
-
-      if (!persistedValue) {
-        return [];
-      }
-
-      const encryptedPayload = Buffer.from(
-        persistedValue.encryptedPayload,
-        'base64',
-      );
-      const decryptedPayload = await decryptString(encryptedPayload);
-      const sessions = parseSessionsPayload(decryptedPayload.result);
-
-      if (decryptedPayload.shouldReEncrypt) {
-        await this.trySaveSessions(sessions);
-      }
-
-      return sessions;
+      return await this.readSessions();
     } catch {
       await this.clearSessionsSafely();
       return [];
     }
+  }
+
+  private async readSessions(): Promise<readonly TmcSecureDesktopAuthSession[]> {
+    const persistedValue = await readPersistedSessions(this.filePath);
+
+    if (!persistedValue) {
+      return [];
+    }
+
+    const encryptedPayload = Buffer.from(
+      persistedValue.encryptedPayload,
+      'base64',
+    );
+    const decryptedPayload = await decryptString(encryptedPayload);
+    const sessions = parseSessionsPayload(decryptedPayload.result);
+
+    if (decryptedPayload.shouldReEncrypt) {
+      await this.trySaveSessions(sessions);
+    }
+
+    return sessions;
   }
 
   /**
@@ -178,25 +186,23 @@ export class TmcSecureAuthSessionStore {
   /**
    * Removes one durable desktop auth session by profile identifier.
    */
-  async deleteSession(profileId: string): Promise<void> {
-    const normalizedProfileId = readString(profileId);
+  async deleteSession(profileId: string): Promise<TmcSecureDesktopAuthSession | null> {
+    return this.enqueueMutation(async () => {
+      const normalizedProfileId = readString(profileId);
 
-    if (!normalizedProfileId) {
-      return;
-    }
+      if (!normalizedProfileId) {
+        return null;
+      }
 
-    const sessions = (await this.loadSessions()).filter((session) => {
-      return session.profileId !== normalizedProfileId;
+      const existingSessions = await this.readSessions();
+      const removedSession = existingSessions.find((session) => session.profileId === normalizedProfileId);
+      const sessions = existingSessions.filter((session) => {
+        return session.profileId !== normalizedProfileId;
+      });
+
+      await this.saveSessions(sessions);
+      return removedSession || null;
     });
-
-    await this.saveSessions(sessions);
-  }
-
-  /**
-   * Removes one durable desktop auth session by profile identifier.
-   */
-  async removeAccount(profileId: string): Promise<void> {
-    await this.deleteSession(profileId);
   }
   /**
    * Removes all encrypted desktop auth sessions from disk.
@@ -244,6 +250,12 @@ export class TmcSecureAuthSessionStore {
    */
   getFilePath(): string {
     return this.filePath;
+  }
+
+  private enqueueMutation<Result>(operation: () => Promise<Result>): Promise<Result> {
+    const result = this.mutationQueue.then(operation);
+    this.mutationQueue = result.then(() => undefined, () => undefined);
+    return result;
   }
 
   private async saveSessions(
@@ -294,14 +306,18 @@ async function readPersistedSessions(
 ): Promise<PersistedEncryptedAuthSessions | null> {
   try {
     const content = await fs.readFile(filePath, 'utf8');
-    const parsedValue = JSON.parse(content) as Partial<PersistedEncryptedAuthSessions>;
+    const parsedValue: unknown = JSON.parse(content);
 
     if (
+      !parsedValue ||
+      typeof parsedValue !== 'object' ||
+      !('version' in parsedValue) ||
       parsedValue.version !== 2 ||
+      !('encryptedPayload' in parsedValue) ||
       typeof parsedValue.encryptedPayload !== 'string' ||
       !parsedValue.encryptedPayload.trim()
     ) {
-      return null;
+      throw new Error('Invalid encrypted desktop session storage.');
     }
 
     return {
@@ -374,10 +390,11 @@ async function decryptString(
 function parseSessionsPayload(
   payloadJson: string,
 ): readonly TmcSecureDesktopAuthSession[] {
-  const payload = JSON.parse(payloadJson) as Partial<SecureAuthSessionsPayload>;
+  const payload: unknown = JSON.parse(payloadJson);
 
-  if (!Array.isArray(payload.accounts)) {
-    return [];
+  if (!payload || typeof payload !== 'object' ||
+    !('accounts' in payload) || !Array.isArray(payload.accounts)) {
+    throw new Error('Invalid desktop session payload.');
   }
 
   return normalizeSessions(payload.accounts);

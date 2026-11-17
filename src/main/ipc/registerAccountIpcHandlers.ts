@@ -1,8 +1,9 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type {
   TmcAccountListResult,
   TmcActiveAccountResult,
-  TmcRemoveLocalAccountRequest,
   TmcSetActiveAccountRequest,
 } from '../../shared/accounts/TmcAccountModels';
 import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
@@ -12,6 +13,13 @@ import type { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
 import type { TmcSecureAuthSessionStore } from '../auth/TmcSecureAuthSessionStore';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import type { TmcChatIpcController } from './registerChatIpcHandlers';
+import {
+  TmcAccountRemovalService,
+  syncAuthSessionStore,
+} from '../accounts/TmcAccountRemovalService';
+
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
+declare const MAIN_WINDOW_VITE_NAME: string;
 
 /**
  * Registers account-related Inter-Process Communication handlers.
@@ -20,11 +28,18 @@ export function registerAccountIpcHandlers(
   accountRegistry: TmcAccountSessionRegistry,
   authSessionStore: TmcAuthSessionStore,
   options: {
-    readonly runtimeConfig?: TmcRuntimeConfig;
-    readonly secureAuthSessionStore?: TmcSecureAuthSessionStore;
-    readonly chatController?: TmcChatIpcController;
-  } = {},
+    readonly runtimeConfig: TmcRuntimeConfig;
+    readonly secureAuthSessionStore: TmcSecureAuthSessionStore;
+    readonly chatController: TmcChatIpcController;
+  },
 ): void {
+  const removalService = new TmcAccountRemovalService(
+    accountRegistry,
+    authSessionStore,
+    options.secureAuthSessionStore,
+    new TmcAuthBrokerClient(options.runtimeConfig, authSessionStore),
+    options.chatController,
+  );
   ipcMain.handle(
     TMC_IPC_CHANNELS.ACCOUNT_LIST,
     async (): Promise<TmcAccountListResult> => {
@@ -55,76 +70,38 @@ export function registerAccountIpcHandlers(
   ipcMain.handle(
     TMC_IPC_CHANNELS.ACCOUNT_REMOVE_LOCAL,
     async (
-      _event,
-      request: TmcRemoveLocalAccountRequest,
+      event: IpcMainInvokeEvent,
+      request: unknown,
     ): Promise<TmcAccountListResult> => {
+      assertTrustedSender(event);
       const profileId = readProfileId(request);
-      const activeProfileId = accountRegistry.getActiveAccountResult().activeProfileId;
-      const wasActiveAccount = activeProfileId === profileId;
-      const savedSession = options.secureAuthSessionStore
-        ? await options.secureAuthSessionStore.findSession(profileId)
-        : null;
-
-      if (
-        savedSession?.desktopSessionToken &&
-        options.runtimeConfig &&
-        options.secureAuthSessionStore
-      ) {
-        const authBrokerClient = new TmcAuthBrokerClient(
-          options.runtimeConfig,
-          authSessionStore,
-        );
-
-        try {
-          await authBrokerClient.logoutDesktopSession(
-            savedSession.desktopSessionToken,
-          );
-        } catch {
-          console.warn('[TMC Accounts] Remote desktop logout failed; local removal continues.');
-        }
-      }
-
-      if (options.secureAuthSessionStore) {
-        await options.secureAuthSessionStore.removeAccount(profileId);
-      }
-
-      await accountRegistry.removeAccount(profileId);
-
-      if (wasActiveAccount) {
-        options.chatController?.disconnectLive();
-      }
-
-      await accountRegistry.ensureActiveAccount();
-      syncAuthSessionStore(authSessionStore, accountRegistry);
-
-      return accountRegistry.listAccounts();
+      return removalService.removeAccount(profileId);
     },
   );
 }
 
-/**
- * Mirrors the active account into the compatibility auth session store.
- */
-export function syncAuthSessionStore(
-  authSessionStore: TmcAuthSessionStore,
-  accountRegistry: TmcAccountSessionRegistry,
-): void {
-  const activeSession = accountRegistry.getActiveSession();
-
-  if (activeSession) {
-    authSessionStore.setSession(activeSession);
-    return;
-  }
-
-  authSessionStore.clearSession();
-}
-
-function readProfileId(request: TmcRemoveLocalAccountRequest): string {
-  const profileId = request?.profileId?.trim();
+function readProfileId(request: unknown): string {
+  const profileId = request && typeof request === 'object' &&
+    'profileId' in request && typeof request.profileId === 'string'
+    ? request.profileId.trim()
+    : '';
 
   if (!profileId) {
     throw new Error('Account profileId is required.');
   }
 
   return profileId;
+}
+
+function assertTrustedSender(event: IpcMainInvokeEvent): void {
+  const expectedUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL || pathToFileURL(
+    path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+  ).href;
+  const window = BrowserWindow.fromWebContents(event.sender);
+
+  if (!window || window.webContents !== event.sender ||
+    event.senderFrame !== event.sender.mainFrame ||
+    event.senderFrame.url !== new URL(expectedUrl).href) {
+    throw new Error('Untrusted account removal sender.');
+  }
 }
