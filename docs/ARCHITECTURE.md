@@ -98,8 +98,11 @@ behavior; the ownership gaps below remain unresolved.
   substitutes. `.github/workflows/quality.yml` configures Windows quality checks
   with Node 24.18.0, `npm ci`, and separate test/typecheck/zero-warning lint steps.
   Baseline hosted execution passed for PR #1 at `ca9c0f2`; that result does not
-  cover later changes or the newly configured separate Windows E2E job, whose
-  hosted execution remains unobserved. Real Twitch login,
+  cover later changes. The first separate Windows E2E run failed during driver
+  negatives because raw short TEMP paths disagreed with canonical cleanup paths;
+  guard/cleanup/scenario steps were skipped. Canonical creation now preserves
+  strict cleanup identity checks; the corrected revision needs hosted verification.
+  Real Twitch login,
   protected packaging, broader account switching and PCG resources remain separate.
 
 These observations are a baseline, not a mandate to refactor them all in one task.

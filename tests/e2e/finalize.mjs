@@ -7,6 +7,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { channel } from 'node:diagnostics_channel';
 import { once } from 'node:events';
 
+export async function createCanonicalTemporaryDirectory(prefix, files = fs) {
+  return files.realpath(await files.mkdtemp(path.join(os.tmpdir(), prefix)));
+}
+
 export function trackOwnedDrivers(driverPath, evidence) {
   const drivers = new Set();
   const pending = new Map();

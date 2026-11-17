@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { builtinModules, createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -10,12 +9,12 @@ import { remote } from 'webdriverio';
 import { startFixture } from './fixture.mjs';
 import { observeDriverTraffic, provenance, verifyDriver } from './driver.mjs';
 import { verifyNetworkEvidence } from './network-evidence.mjs';
-import { finalizeAccountRemoval, trackOwnedDrivers } from './finalize.mjs';
+import { createCanonicalTemporaryDirectory, finalizeAccountRemoval, trackOwnedDrivers } from './finalize.mjs';
 
 const require = createRequire(import.meta.url);
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(project, '.test-build/electron-e2e');
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tmc-electron-e2e-'));
+const root = await createCanonicalTemporaryDirectory('tmc-electron-e2e-');
 const evidence = path.join(output, `evidence-${path.basename(root)}`);
 let browser;
 let fixture;

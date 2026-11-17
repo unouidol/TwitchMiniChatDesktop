@@ -67,8 +67,8 @@ Local validation does not execute that hosted environment.
 
 The baseline workflow passed on [draft PR #1](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/43496736663)
 for head `ca9c0f22c9335a901fcae5759550f307eae50f81`. This does not verify
-later changes or the newly configured Electron E2E job, whose hosted execution
-has not yet been observed.
+later changes. The first Electron E2E hosted run is described below; it failed,
+and must not be counted as a passing scenario.
 After a successful hosted run, the maintainer may separately configure required
 checks. Defining a workflow does not configure branch protection.
 
@@ -192,8 +192,14 @@ Windows copy using Node 24.18.0/npm 11.16.0, including fresh `npm ci`, official
 provisioning and environment-file handoff: driver 4/4, network guards 4/4,
 cleanup 9/9 and one full real-Electron restart passed. Typecheck, zero-warning
 lint, workflow validation and local artifact-selection checks also passed.
-The upload action itself was not run locally. The job is configured but its
-first GitHub-hosted result remains outstanding; earlier baseline CI is not that result.
+The upload action itself was not run locally. The first hosted run,
+[44043286718](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/44043286718),
+passed quality checks but failed driver checks (3/4): Windows returned a short
+TEMP alias from directory creation and a long path from `realpath`. The strict
+cleanup identity check correctly refused that inconsistent path; the missing
+`Diagnostics:` assertion was secondary, not missing diagnostic files. Guard,
+cleanup and full scenario steps were skipped. A corrected revision needs its
+own hosted result; the earlier baseline CI is not that result.
 
 The launcher requires the explicit absolute path and verifies its regular-file
 status and SHA-256 **before** executing `--version`. It checks the pinned driver
@@ -311,6 +317,17 @@ restricted to the explicit driver and this run's log arguments; live Electron
 PIDs must match the expected executable and unique profile marker before signaling.
 Unknown ownership or unverified process shutdown retains the profile and fails,
 reporting its path. The fixture attempts HTTP and WebSocket closure independently.
+
+Temporary directories are canonicalized with
+[`fs.promises.realpath`](https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesrealpathpath-options)
+immediately after creation, before bootstrap arguments, process markers or cleanup
+receive them. Cleanup still requires exact canonical identity, the canonical TEMP
+parent, ownership marker and verified process releases; redirected/replaced paths
+are not accepted. Regression teardown uses the same canonical creation path.
+Coverage includes a deterministic alias-return boundary with real directory cleanup,
+a native Windows 8.3 alias check (explicitly skipped when unavailable), and rejected
+redirected identity without deletion. No machine-wide TEMP or filesystem setting
+is changed.
 
 The original scenario cause and secondary failures remain in an `AggregateError`.
 `finalization.json` records attempted releases and any remaining profile. A failed

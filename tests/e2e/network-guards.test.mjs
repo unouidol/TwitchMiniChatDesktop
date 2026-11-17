@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import { build } from 'vite';
 import { WebSocketServer } from 'ws';
 import { verifyNetworkEvidence } from './network-evidence.mjs';
+import { createCanonicalTemporaryDirectory } from './finalize.mjs';
 
 const require = createRequire(import.meta.url);
 const project = fileURLToPath(new URL('../../', import.meta.url));
@@ -46,7 +47,8 @@ async function target() {
 }
 
 async function removeOwnedProfile(root) {
-  assert.equal(path.dirname(await fs.realpath(root)), await fs.realpath(os.tmpdir()));
+  assert.equal(await fs.realpath(root), root);
+  assert.equal(path.dirname(root), await fs.realpath(os.tmpdir()));
   assert.equal(await fs.readFile(path.join(root, 'fixture-owner'), 'utf8'), 'tmc-network-guard-probe');
   const deadline = Date.now() + 10000;
   for (;;) {
@@ -59,7 +61,7 @@ async function removeOwnedProfile(root) {
 
 for (const transport of ['mainFetch', 'mainWebSocket', 'chromium']) {
   test(`real Electron ${transport} guard rejects and records a local unexpected destination`, async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tmc-electron-e2e-'));
+    const root = await createCanonicalTemporaryDirectory('tmc-electron-e2e-');
     await fs.writeFile(path.join(root, 'fixture-owner'), 'tmc-network-guard-probe');
     const evidence = path.join(output, `guard-probe-${transport}-${path.basename(root)}`);
     await fs.mkdir(evidence, { recursive: true });
