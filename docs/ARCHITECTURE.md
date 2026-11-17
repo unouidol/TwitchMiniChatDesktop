@@ -71,6 +71,15 @@ Finalizing a new login likewise saves and registers the session before selecting
 it. Failed persistence leaves the previous account active (or remains signed out)
 and exposes a fixed storage-error message, not decrypted content, to the renderer.
 
+Startup keeps the saved active-account preference unresolved while durable
+sessions populate the registry. Restores with `makeActive: false` do not select
+or persist intermediate fallback accounts. The composition resolves selection
+once the restore batch completes, then synchronizes compatibility authentication.
+An available preferred account wins regardless of restore order. Otherwise a
+restored account is selected as fallback; if none restores, the app remains signed
+out without overwriting the saved preference. Explicit selection, new login and
+account removal still resolve selection through the existing registry methods.
+
 ## Chat and account state
 
 Account-scoped recent/favorite/last channels live in `TmcAccountChannelStore`.

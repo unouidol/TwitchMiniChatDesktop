@@ -178,6 +178,15 @@ try {
   fixture = await startFixture();
   const first = await launch('first');
   assert.deepEqual((await options()).sort(), ['A', 'B']);
+  assert.ok(['A', 'B'].includes(first.startupPreferredProfileId));
+  const firstRestoreOrder = fixture.requests.filter((entry) => entry.phase === 'first' && entry.path === '/restore')
+    .map((entry) => entry.profileId);
+  assert.equal(firstRestoreOrder.length, 2);
+  assert.notEqual(firstRestoreOrder[0], first.startupPreferredProfileId, 'Preferred account must restore after another account');
+  const initialActiveProfileId = await browser.$('[data-tmc-account-select]').getValue();
+  assert.equal(initialActiveProfileId, first.startupPreferredProfileId, 'Startup selection must honor the saved preference');
+  assert.match(await browser.$('[data-tmc-account-status]').getText(),
+    new RegExp(`fixture-${first.startupPreferredProfileId.toLowerCase()}`));
   await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
   await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-a'),
     { timeout: 20000, timeoutMsg: 'UI selected-account display should show A' });
@@ -217,6 +226,7 @@ try {
   assert.equal(failureLog, '');
   result = {
     firstPid: first.pid, restartedPid: restarted.pid,
+    initialActiveProfileId,
     requests: fixture.requests, chats: fixture.chats,
     applicationNetwork: { first: firstNetwork, restart: restartNetwork },
     persistedProfilesAfterRestart: restarted.savedProfiles,
