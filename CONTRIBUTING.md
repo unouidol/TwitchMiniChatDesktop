@@ -206,8 +206,20 @@ at head `4a0ee1c9b6ef283dda53a6c836cc8f2cc89831b7` passed quality and driver
 checks, but failed network guards (1/4): Electron's non-native synchronous
 `realpathSync` still retained a short TEMP ancestor. Cleanup regressions and the
 full scenario were skipped. Electron bootstrap and probe now use
-`realpathSync.native` for both profile root and TEMP parent; this revision still
-needs its own hosted result.
+`realpathSync.native` for both profile root and TEMP parent.
+
+Hosted run
+[44054285201](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/44054285201)
+passed both Windows jobs at head `01ee0beea53d538ca5a87d3bddb2ee9010e0dfb1`.
+Its synthetic merge `15be8a7c39ba44e3da4c77c7d36ba7bd2c3a0007` has that head
+and base `ca9c0f22c9335a901fcae5759550f307eae50f81` as parents and the same
+tree as the head. Driver checks passed 4/4, guards 5/5 and cleanup 12/12 with no
+skips, including native short-TEMP coverage. The full UI-removal/restart scenario
+restored only B and finalized without errors or a remaining profile. The diagnostic
+artifact contained 45 allowlisted files; its ZIP SHA-256 matched the GitHub digest
+`f5fd9fb9714d08a98e8feb95ca88e416bcfe879d977e9402edc93ab0da5e780b`.
+This establishes that revision's synthetic hosted scenario, not real login or
+packaged-app behavior. Later code changes require their own evidence.
 
 On 2026-11-17, local verification with Node 24.18.0/npm 11.16.0 passed
 driver checks (4/4), cleanup regressions (12/12) and one full Electron UI/restart

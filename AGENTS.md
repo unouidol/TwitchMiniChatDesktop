@@ -43,10 +43,9 @@ These instructions apply to the entire Electron/TypeScript repository.
 - Run `npm run test:e2e` for the Windows synthetic Electron UI/restart scenario.
   Keep its marked temp profile and local-only transports isolated; it is not a
   real-login or packaged-release test. The separate Windows E2E job is configured;
-  the latest hosted run passed driver checks but failed Electron guard bootstrap
-  on a Windows temporary-path alias. Native synchronous canonicalization now
-  matches the parent launcher; this revision needs a new hosted result before
-  claiming CI success.
+  hosted run 44054285201 passed quality checks and the full E2E scenario at
+  `01ee0beea53d538ca5a87d3bddb2ee9010e0dfb1`, including native short-TEMP
+  coverage. Later changes need their own hosted result before claiming CI success.
 - Preserve temporary storage, synthetic sessions, HTTP substitutes, and the
   real-WebSocket guard. Do not launch authenticated services for automated tests.
   Add focused behavior coverage for auth, isolation, persistence, and lifecycle.

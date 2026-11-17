@@ -105,7 +105,11 @@ behavior; the ownership gaps below remain unresolved.
   checks but failed during Electron guard bootstrap: non-native synchronous
   realpath retained a short TEMP ancestor. Electron now uses `realpathSync.native`
   for profile and parent checks; the guard suite exercises a real short-TEMP child
-  process. The full corrected revision still needs hosted verification.
+  process. Hosted run
+  [44054285201](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/44054285201)
+  passed quality checks, driver 4/4, guards 5/5, cleanup 12/12 and the full
+  synthetic UI/restart scenario at `01ee0be`, with native short-TEMP checks not
+  skipped and the owned profile removed. Later changes need their own evidence.
   Real Twitch login,
   protected packaging, broader account switching and PCG resources remain separate.
 
