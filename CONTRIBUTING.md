@@ -200,6 +200,24 @@ cleanup identity check correctly refused that inconsistent path; the missing
 `Diagnostics:` assertion was secondary, not missing diagnostic files. Guard,
 cleanup and full scenario steps were skipped. A corrected revision needs its
 own hosted result; the earlier baseline CI is not that result.
+The next hosted run,
+[44049066827](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/44049066827),
+at head `4a0ee1c9b6ef283dda53a6c836cc8f2cc89831b7` passed quality and driver
+checks, but failed network guards (1/4): Electron's non-native synchronous
+`realpathSync` still retained a short TEMP ancestor. Cleanup regressions and the
+full scenario were skipped. Electron bootstrap and probe now use
+`realpathSync.native` for both profile root and TEMP parent; this revision still
+needs its own hosted result.
+
+On 2026-11-17, local verification with Node 24.18.0/npm 11.16.0 passed
+driver checks (4/4), cleanup regressions (12/12) and one full Electron UI/restart
+scenario with TEMP/TMP set to a native 8.3 alias of a disposable directory.
+Network guards passed 5/5, including the new short-TEMP child probe without skips;
+that regression failed with the previous synchronous checks and passed with the
+native checks. Account tests (16/16), typecheck and zero-warning lint passed.
+The wrapper's empty-parent check additionally found npm's `node-compile-cache`;
+that verified cache and parent were removed separately. Electron profiles were
+removed by their existing finalizers. These are local results, not a hosted pass.
 
 The launcher requires the explicit absolute path and verifies its regular-file
 status and SHA-256 **before** executing `--version`. It checks the pinned driver
@@ -323,11 +341,17 @@ Temporary directories are canonicalized with
 immediately after creation, before bootstrap arguments, process markers or cleanup
 receive them. Cleanup still requires exact canonical identity, the canonical TEMP
 parent, ownership marker and verified process releases; redirected/replaced paths
-are not accepted. Regression teardown uses the same canonical creation path.
+are not accepted. Electron bootstrap and probe use `fs.realpathSync.native` for
+the matching synchronous checks; the non-native synchronous implementation can
+retain short ancestor names. Regression teardown uses the same canonical creation path.
 Coverage includes a deterministic alias-return boundary with real directory cleanup,
 a native Windows 8.3 alias check (explicitly skipped when unavailable), and rejected
 redirected identity without deletion. No machine-wide TEMP or filesystem setting
-is changed.
+is changed. The guard suite also launches an independent real-Electron main-fetch
+probe with TEMP/TMP set to a native 8.3 alias of a disposable parent. It requires
+actual probe completion, network-denial evidence and removal of the child profile;
+the empty parent is then removed without recursive deletion. This case explicitly
+skips when Windows short aliases are unavailable.
 
 The original scenario cause and secondary failures remain in an `AggregateError`.
 `finalization.json` records attempted releases and any remaining profile. A failed

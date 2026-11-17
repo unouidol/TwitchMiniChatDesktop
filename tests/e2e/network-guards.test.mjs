@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { builtinModules, createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -115,4 +115,36 @@ test('missing, incomplete and inconsistent network evidence is never an empty su
   assert.throws(() => verifyNetworkEvidence({ schemaVersion: 1, collectionComplete: true, completionReason: 'will-quit',
     installed: { mainFetch: true, mainWebSocket: true, chromium: true }, events: [],
     counts: { mainFetch: { allowed: 1, denied: 0 } }, scopes: { mainFetch: 'test' } }));
+});
+
+test('real Electron guard bootstrap accepts a native short TEMP parent', async (context) => {
+  if (process.platform !== 'win32') return context.skip('Windows short aliases require Windows');
+  const temporaryParent = await createCanonicalTemporaryDirectory('tmc-probe-temp-');
+  try {
+    const alias = execFileSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      '$ErrorActionPreference="Stop"; (New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:TMC_ALIAS_PATH).ShortPath'], {
+      env: { ...process.env, TMC_ALIAS_PATH: temporaryParent }, encoding: 'utf8', windowsHide: true, timeout: 5000,
+    }).trim();
+    if (!/~\d+(?:[\\/]|$)/.test(alias)) return context.skip('No native 8.3 alias available');
+    assert.notEqual(alias, temporaryParent);
+    assert.equal(await fs.realpath(alias), temporaryParent);
+    const env = { ...process.env, TEMP: alias, TMP: alias };
+    // This is an independent runner, not a test file dispatched by the parent runner.
+    delete env.NODE_TEST_CONTEXT;
+    const child = spawnSync(process.execPath, ['--test', '--test-name-pattern=^real Electron mainFetch guard',
+      fileURLToPath(import.meta.url)], {
+      cwd: project, env,
+      encoding: 'utf8', windowsHide: true, timeout: 60000,
+    });
+    context.diagnostic(child.stdout + child.stderr);
+    assert.ifError(child.error);
+    assert.equal(child.status, 0, 'Real Electron probe must pass with native short TEMP');
+    assert.match(child.stdout, /Probe process exited and owned profile removed; evidence:/);
+    assert.deepEqual(await fs.readdir(temporaryParent), [], 'Nested probe must remove its owned profile');
+  } finally {
+    assert.equal(await fs.realpath(temporaryParent), temporaryParent);
+    assert.equal(path.dirname(temporaryParent), await fs.realpath(os.tmpdir()));
+    assert.ok(path.basename(temporaryParent).startsWith('tmc-probe-temp-'));
+    await fs.rmdir(temporaryParent);
+  }
 });

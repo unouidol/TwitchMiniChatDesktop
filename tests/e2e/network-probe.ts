@@ -7,8 +7,8 @@ import { installNetworkGuards } from './network-guards';
 
 const rootArgument = process.argv.find((value) => value.startsWith('--tmc-probe-root='));
 assert.ok(rootArgument);
-const root = fs.realpathSync(rootArgument.slice('--tmc-probe-root='.length));
-assert.equal(path.dirname(root), fs.realpathSync(os.tmpdir()));
+const root = fs.realpathSync.native(rootArgument.slice('--tmc-probe-root='.length));
+assert.equal(path.dirname(root), fs.realpathSync.native(os.tmpdir()));
 assert.ok(path.basename(root).startsWith('tmc-electron-e2e-'));
 assert.equal(fs.readFileSync(path.join(root, 'fixture-owner'), 'utf8'), 'tmc-network-guard-probe');
 for (const name of ['appData', 'userData', 'sessionData', 'logs', 'crashDumps'] as const) {

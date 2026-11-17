@@ -101,7 +101,11 @@ behavior; the ownership gaps below remain unresolved.
   cover later changes. The first separate Windows E2E run failed during driver
   negatives because raw short TEMP paths disagreed with canonical cleanup paths;
   guard/cleanup/scenario steps were skipped. Canonical creation now preserves
-  strict cleanup identity checks; the corrected revision needs hosted verification.
+  strict cleanup identity checks. The next hosted run at `4a0ee1c` passed driver
+  checks but failed during Electron guard bootstrap: non-native synchronous
+  realpath retained a short TEMP ancestor. Electron now uses `realpathSync.native`
+  for profile and parent checks; the guard suite exercises a real short-TEMP child
+  process. The full corrected revision still needs hosted verification.
   Real Twitch login,
   protected packaging, broader account switching and PCG resources remain separate.
 

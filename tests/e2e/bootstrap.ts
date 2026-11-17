@@ -12,8 +12,8 @@ function argument(name: string): string {
   return value;
 }
 
-const root = fs.realpathSync(argument('root'));
-assert.equal(path.dirname(root), fs.realpathSync(os.tmpdir()));
+const root = fs.realpathSync.native(argument('root'));
+assert.equal(path.dirname(root), fs.realpathSync.native(os.tmpdir()));
 assert.ok(path.basename(root).startsWith('tmc-electron-e2e-'));
 assert.equal(fs.readFileSync(path.join(root, 'fixture-owner'), 'utf8'), 'tmc-electron-account-removal');
 const phase = argument('phase');
