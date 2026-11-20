@@ -23,10 +23,14 @@ export type TmcPcgStatusState = 'empty' | 'loading' | 'active' | 'error';
  */
 export type TmcPcgDisplayMode = 'embedded' | 'detached';
 
+/** Local Twitch browser-session evidence, not extension authorization/provider validation. */
+export type TmcPcgTwitchAuth = 'unknown' | 'signed-out' | 'session-present';
+
 /**
  * Renderer-safe PCG panel status.
  */
 export type TmcPcgStatus = {
+  readonly twitchAuth: TmcPcgTwitchAuth;
   /**
    * Current PCG panel lifecycle state.
    */

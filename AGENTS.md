@@ -60,7 +60,52 @@ These instructions apply to the entire Electron/TypeScript repository.
 - Update documentation to match actual behavior. Report commands, versions,
   results, diagnostics, and missing evidence. Documentation does not complete an
   unperformed acceptance check; local passes do not prove hosted CI or real login.
-- Commit, push, publish, or change repository settings only when authorized.
+- Follow the delegated Git authority below. Release publication and repository
+  settings changes still require explicit authorization.
+
+## Git ownership and repository maintenance
+
+- The user delegates day-to-day Git organization and maintenance to the coding
+  agent. Take responsibility for a coherent, recoverable history and an orderly
+  repository; do not leave this coordination to the user. Within requested work,
+  this includes feature-branch creation, logical commits, normal pushes, draft PR
+  creation/updates and verified merged-branch cleanup without repeated approval.
+- Before Git mutations, inspect the branch, working tree, index, upstream and
+  relevant PRs. Preserve existing/unrelated work and unpublished commits. Verify
+  the actual remote integration branch; current documentation names `main`.
+  Treat "stable" as a release/integration target to verify, not permission to
+  invent or rename a branch. Do not add permanent development/release branches
+  without an actual workflow need.
+- Use short-lived, descriptive `codex/<topic>` branches and reuse a suitable
+  existing branch/PR for the same change. Keep unrelated topics separate. If PRs
+  depend on one another, record their bases and merge order explicitly.
+- Checkpoint completed, validated increments promptly instead of accumulating
+  multiple features in an uncommitted working tree. Keep each commit coherent
+  and revertible, including its relevant tests/docs. Use concise English commit
+  subjects describing the change; do not fabricate independent commits by
+  splitting tightly coupled code into broken intermediate states.
+- Inspect the actual staged diff, new files and lockfile before every commit;
+  stage only the intended changes. Keep secrets, authenticated profiles,
+  generated binaries, dependencies and temporary evidence out of history.
+- Push ordinary feature-branch updates for remote recovery and keep draft PR
+  titles/descriptions aligned with final scope, dependencies and observed checks.
+  Distinguish local results, exact hosted commit/run evidence and manual checks.
+  Never call work ready because a draft exists or an older CI run passed.
+- Integrate into `main`, a verified stable/release branch, or publish a release
+  or tag only with explicit user authorization, appropriate review and passing
+  required checks for the final candidate. Resolve failures at their cause;
+  never bypass branch protections or weaken checks to obtain a merge.
+- Prefer follow-up commits and `git revert` for shared history. Do not force-push,
+  rewrite published history, retarget release tags, discard work or delete
+  unmerged/unique work without explicit authorization. Do not change repository
+  protections, visibility, access or global Git configuration as routine cleanup.
+- After an authorized merge, synchronize the integration branch without losing
+  local work and remove only branches verified merged with no unique/unpublished
+  work or dependent PR/worktree. Preserve historical backup/spike branches until
+  their ownership and purpose are established. Report branch/commit/PR, CI status
+  and outstanding work accurately; never claim a clean tree without checking.
+- Use the [Git workflow in CONTRIBUTING.md](CONTRIBUTING.md#git-workflow) for the
+  operating sequence and official reference material.
 
 ## Review findings
 

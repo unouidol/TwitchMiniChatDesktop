@@ -5,6 +5,7 @@ import {
   type BrowserWindowConstructorOptions,
   type Rectangle,
   type WebContents,
+  type Cookie,
 } from 'electron';
 import type {
   TmcPcgBoundsRequest,
@@ -34,6 +35,7 @@ const TWITCH_AUTH_HOSTS = new Set([
  */
 export class TmcPcgSessionManager {
   private status: TmcPcgStatus = {
+    twitchAuth: 'unknown',
     state: 'empty',
     displayMode: 'embedded',
     profileId: null,
@@ -49,6 +51,8 @@ export class TmcPcgSessionManager {
   private panelUrl: string | null = null;
   private readonly detachedWindows = new Map<string, BrowserWindow>();
   private detachedPanelWindow: BrowserWindow | null = null;
+  private stopTwitchAuthObservation: (() => void) | null = null;
+  private activationRevision = 0;
 
   constructor(
     private readonly config: TmcRuntimeConfig,
@@ -277,6 +281,7 @@ export class TmcPcgSessionManager {
     channel: string,
     ownerWindow?: BrowserWindow | null,
   ): Promise<TmcPcgStatus> {
+    const activation = ++this.activationRevision;
     let key: TmcPcgSessionKey;
 
     try {
@@ -306,6 +311,7 @@ export class TmcPcgSessionManager {
     this.panelUrl = url;
     this.setStatus({
       state: 'loading',
+      twitchAuth: this.status.profileId === key.profileId ? this.status.twitchAuth : 'unknown',
       displayMode: this.status.displayMode,
       profileId: key.profileId,
       channel: key.channel,
@@ -317,6 +323,7 @@ export class TmcPcgSessionManager {
       this.applyCurrentBounds();
       console.info(`[PCG] loading panel ${sanitizeUrlForLog(url)}`);
       await view.webContents.loadURL(url);
+      if (activation !== this.activationRevision || this.view !== view) return this.status;
 
       return this.setStatus({
         state: 'active',
@@ -326,6 +333,7 @@ export class TmcPcgSessionManager {
         message: null,
       });
     } catch (error) {
+      if (activation !== this.activationRevision) return this.status;
       return this.setStatus({
         state: 'error',
         displayMode: this.status.displayMode,
@@ -362,18 +370,59 @@ export class TmcPcgSessionManager {
     }
 
     this.detachCurrentView();
+    this.stopTwitchAuthObservation?.();
     this.closeAuthPopup();
     this.currentPartition = partition;
     this.view = new WebContentsView({
       webPreferences: buildPcgWebPreferences(partition),
     });
     this.configurePcgWebContents(this.view, partition, ownerWindow);
+    this.observeTwitchAuthentication(this.view, profileId, partition);
 
     if (ownerWindow) {
       this.attachViewToWindow(ownerWindow);
     }
 
     return this.view;
+  }
+
+  private observeTwitchAuthentication(view: WebContentsView, profileId: string, partition: string): void {
+    const contents = view.webContents;
+    const cookies = contents.session.cookies;
+    let revision = 0;
+    let stopped = false;
+    const isCurrent = (request: number): boolean => !stopped && request === revision &&
+      this.view === view && !contents.isDestroyed() &&
+      this.currentPartition === partition && this.status.profileId === profileId;
+    const refresh = async (): Promise<void> => {
+      const request = ++revision;
+      try {
+        const matches = await cookies.get({ url: 'https://www.twitch.tv', name: TWITCH_AUTH_COOKIE_NAME });
+        if (!isCurrent(request)) return;
+        this.setStatus({ ...this.status, twitchAuth: matches.length ? 'session-present' : 'signed-out' });
+      } catch {
+        if (!isCurrent(request)) return;
+        console.warn('[PCG] Twitch browser-session state could not be checked.');
+        this.setStatus({ ...this.status, twitchAuth: 'unknown' });
+      }
+    };
+    const changed = (_event: Electron.Event, cookie: Cookie): void => {
+      const domain = (cookie.domain || '').replace(/^\./, '').toLowerCase();
+      if (cookie.name === TWITCH_AUTH_COOKIE_NAME &&
+          (domain === TWITCH_HOST_SUFFIX || domain.endsWith(`.${TWITCH_HOST_SUFFIX}`))) void refresh();
+    };
+    const stop = (): void => {
+      if (stopped) return;
+      stopped = true;
+      revision++;
+      cookies.removeListener('changed', changed);
+      contents.removeListener('destroyed', stop);
+      if (this.stopTwitchAuthObservation === stop) this.stopTwitchAuthObservation = null;
+    };
+    cookies.on('changed', changed);
+    contents.once('destroyed', stop);
+    this.stopTwitchAuthObservation = stop;
+    void refresh();
   }
 
   private configurePcgWebContents(
@@ -692,11 +741,11 @@ export class TmcPcgSessionManager {
     };
   }
 
-  private setStatus(status: TmcPcgStatus): TmcPcgStatus {
-    this.status = status;
-    this.onStatusChanged(status);
+  private setStatus(status: Omit<TmcPcgStatus, 'twitchAuth'> & Partial<Pick<TmcPcgStatus, 'twitchAuth'>>): TmcPcgStatus {
+    this.status = { ...status, twitchAuth: status.twitchAuth ?? this.status.twitchAuth };
+    this.onStatusChanged(this.status);
 
-    return status;
+    return this.status;
   }
 }
 

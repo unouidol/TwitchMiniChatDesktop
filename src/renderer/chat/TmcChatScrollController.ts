@@ -9,8 +9,13 @@ const CHAT_BOTTOM_THRESHOLD_PX = 64;
 export class TmcChatScrollController {
   private shouldAutoScroll = true;
   private newMessageCount = 0;
+  private revealedScrollTop: number | null = null;
 
   private readonly handleScroll = (): void => {
+    if (this.revealedScrollTop !== null) {
+      if (this.chatList.scrollTop === this.revealedScrollTop) return;
+      this.revealedScrollTop = null;
+    }
     this.shouldAutoScroll = this.isNearBottom();
 
     if (this.shouldAutoScroll) {
@@ -58,10 +63,25 @@ export class TmcChatScrollController {
     this.scrollToLatest();
   }
 
+  /** Keep followers at the latest message when an integrated panel changes chat height. */
+  notifyViewportChanged(): void {
+    if (this.shouldAutoScroll) this.scrollToLatest();
+  }
+
+  /** Explicit navigation pauses following through the existing scroll owner. */
+  revealMessage(row: HTMLElement): void {
+    this.shouldAutoScroll = false;
+    row.scrollIntoView({ block: 'center' });
+    row.tabIndex = -1;
+    row.focus({ preventScroll: true });
+    this.revealedScrollTop = this.chatList.scrollTop;
+  }
+
   /**
    * Clears pending state before a channel or account context changes.
    */
   resetForContextChange(): void {
+    this.revealedScrollTop = null;
     this.shouldAutoScroll = true;
     this.clearNewMessageCount();
   }
@@ -84,6 +104,7 @@ export class TmcChatScrollController {
   }
 
   private scrollToLatest(): void {
+    this.revealedScrollTop = null;
     this.chatList.scrollTop = this.chatList.scrollHeight;
     this.shouldAutoScroll = true;
     this.clearNewMessageCount();

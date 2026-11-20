@@ -1,4 +1,7 @@
-﻿/**
+import type { TmcMessageFragment } from '../chat/TmcMessageContent';
+import type { TmcChatAttention } from '../chat/TmcChatAttention';
+
+/**
  * Request used by the renderer to ask the main process for cached chat history.
  */
 export type LoadHistoryRequest = {
@@ -17,6 +20,9 @@ export type LoadHistoryRequest = {
  * Normalized chat history message returned to the local renderer.
  */
 export type TmcHistoryMessage = {
+  readonly badges?: readonly import('../chat/TmcChatBadges').TmcChatBadge[];
+  readonly attention?: TmcChatAttention;
+  readonly color?: string;
   /**
    * Stable message identifier when available from the backend.
    */
@@ -43,9 +49,9 @@ export type TmcHistoryMessage = {
   readonly timestampMillis: number;
 
   /**
-   * Optional raw Twitch emote metadata, when provided by the backend.
+   * Validated message pieces, when Twitch emote metadata is available.
    */
-  readonly emotesRaw?: string;
+  readonly fragments?: readonly TmcMessageFragment[];
 };
 
 /**

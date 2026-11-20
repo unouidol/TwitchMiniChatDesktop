@@ -4,6 +4,10 @@ import { appendLocalMessage } from '../chat/appendLocalMessage';
 import { TmcChatInputHistoryController } from '../chat/TmcChatInputHistoryController';
 import { TmcChannelChatController } from '../chat/TmcChannelChatController';
 import { initializePcgPanel } from '../pcg/initializePcgPanel';
+import { initializeEmotePicker, notifyEmoteMessageSent } from '../chat/initializeEmotePicker';
+import { initializeReplyComposer } from '../chat/initializeReplyComposer';
+import { initializeChatCompletion } from '../chat/initializeChatCompletion';
+import { initializeChatAppearance } from '../chat/initializeChatAppearance';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
 //import { initializePcgSessionPanel } from '../pcg/initializePcgSessionPanel';
 
@@ -31,8 +35,11 @@ export async function bootstrapRenderer(): Promise<void> {
     loadHistoryButton,
     //pcgSessionPanel,
   });
+  const appearance = initializeChatAppearance(tmc, () => chatController.notifyViewportChanged());
+  window.addEventListener('pagehide', () => appearance.dispose(), { once: true });
 
   initializeAccountSwitcher(tmc);
+  window.addEventListener('pagehide', () => chatController.dispose(), { once: true });
 
   try {
     initializePcgPanel(tmc);
@@ -41,6 +48,13 @@ export async function bootstrapRenderer(): Promise<void> {
   }
 
   await initializeAuthPanel();
+  const picker = initializeEmotePicker(() => chatController.getCurrentChannel(), () => chatController.notifyViewportChanged(), () => completion.dismiss());
+  const completion = initializeChatCompletion(tmc, () => chatController.getCurrentChannel(), () => chatController.getCompletionUsers(),
+    () => chatController.notifyViewportChanged(), () => picker.close());
+  window.addEventListener('pagehide', () => inputHistoryController?.destroy(), { once: true });
+  const replyComposer = initializeReplyComposer(() => chatController.getCurrentChannel(), () => chatController.notifyViewportChanged());
+  window.addEventListener('pagehide', () => replyComposer.dispose(), { once: true });
+  let sending = false;
 
 
   channelForm?.addEventListener('submit', (event) => {
@@ -55,39 +69,45 @@ export async function bootstrapRenderer(): Promise<void> {
     void chatController.switchToChannel(requestedChannel);
   });
 
+  loadHistoryButton?.addEventListener('click', () => {
+    void chatController.refreshCurrentChannel();
+  });
+
   composerForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
     const text = messageInput?.value.trim();
 
-    if (!text) {
+    if (!text || sending) {
       return;
     }
 
-    const channel = readSelectedChannel(channelInput);
+    const channel = chatController.getCurrentChannel();
+    if (!channel) return;
     const activeAccountId = readActiveAccountId();
+    if (!activeAccountId) return;
+    const draft = messageInput?.value;
+    const replySnapshot = replyComposer.snapshot();
+    sending = true;
 
     try {
-      await tmc.chat.sendMessage({ channel, text });
+      await tmc.chat.sendMessage({ profileId: activeAccountId, channel, text, reply: replySnapshot.reply });
+      notifyEmoteMessageSent(activeAccountId, channel);
       inputHistoryController?.recordSentMessage(text, activeAccountId);
 
-      if (messageInput) {
+      if (messageInput && messageInput.value === draft && readActiveAccountId() === activeAccountId && chatController.getCurrentChannel() === channel && replyComposer.isCurrent(replySnapshot.revision)) {
         messageInput.value = '';
         messageInput.focus();
       }
+      replyComposer.complete(replySnapshot.revision);
     } catch {
-      appendLocalMessage('system', 'Live chat connection required.');
+      if (readActiveAccountId() === activeAccountId && chatController.getCurrentChannel() === channel) appendLocalMessage('system', 'Message not sent. Check the live connection, account and channel, then try again.');
+    } finally {
+      sending = false;
     }
   });
 
   await chatController.initialize();
-}
-
-/**
- * Reads the currently selected channel from the shell input.
- */
-function readSelectedChannel(channelInput: HTMLInputElement | null): string {
-  return normalizeChannel(channelInput?.value ?? '') || 'unouidol';
 }
 
 /**

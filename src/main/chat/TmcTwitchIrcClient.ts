@@ -1,4 +1,7 @@
-﻿import type {
+import { parseTwitchMessageContent } from '../../shared/chat/TmcMessageContent';
+import { readChatReply, type TmcChatReply } from '../../shared/chat/TmcChatReply';
+import { readTwitchNameColor } from '../../shared/chat/TmcChatNameColor';
+import type {
   TmcChatConnectionState,
   TmcChatLiveStatus,
   TmcLiveChatMessage,
@@ -47,6 +50,7 @@ type ParsedIrcLine = {
   readonly trailing: string | null;
 };
 
+import { readChatBadges, type TmcChatBadge } from '../../shared/chat/TmcChatBadges';
 const TWITCH_IRC_WEBSOCKET_URL = 'wss://irc-ws.chat.twitch.tv:443';
 
 /**
@@ -70,6 +74,8 @@ export class TmcTwitchIrcClient {
   private socket: WebSocket | null = null;
   private channel: string | null = null;
   private username: string | null = null;
+  private selfColor: string | undefined;
+  private selfBadges: readonly TmcChatBadge[] = [];
   private messageSequence = 0;
   private status: TmcChatLiveStatus = {
     state: 'disconnected',
@@ -105,6 +111,8 @@ export class TmcTwitchIrcClient {
     const accessToken = normalizeAccessToken(params.accessToken);
 
     this.closeCurrentSocket();
+    this.selfColor = undefined;
+    this.selfBadges = [];
     this.channel = channel;
     this.username = username;
     this.updateStatus('connecting', channel, `Connecting to #${channel}...`);
@@ -182,7 +190,7 @@ export class TmcTwitchIrcClient {
   /**
    * Sends one explicit user-authored chat message to Twitch IRC.
    */
-  sendMessage(channel: string, text: string): TmcLiveChatMessage {
+  sendMessage(channel: string, text: string, reply?: TmcChatReply): TmcLiveChatMessage {
     const normalizedChannel = normalizeChannel(channel);
     const normalizedText = normalizeChatText(text);
     const socket = this.socket;
@@ -196,9 +204,14 @@ export class TmcTwitchIrcClient {
       throw new Error('Twitch chat is not connected.');
     }
 
-    this.sendIrcLine(`PRIVMSG #${normalizedChannel} :${normalizedText}`);
+    if (normalizedChannel !== this.channel) throw new Error('Chat channel changed.');
+    const validatedReply = readChatReply(reply);
+    if (reply !== undefined && !validatedReply) throw new Error('Invalid chat reply.');
+    const prefix = validatedReply ? `@reply-parent-msg-id=${validatedReply.parentMessageId} ` : '';
+    this.sendIrcLine(`${prefix}PRIVMSG #${normalizedChannel} :${normalizedText}`);
 
-    return createLocalSelfMessage(normalizedChannel, normalizedText, username);
+    return { ...createLocalSelfMessage(normalizedChannel, normalizedText, username), reply: validatedReply, color: this.selfColor,
+      ...(this.selfBadges.length ? { badges: this.selfBadges } : {}) };
   }
 
   /**
@@ -241,6 +254,12 @@ export class TmcTwitchIrcClient {
 
     if (parsedLine.command === 'NOTICE') {
       this.handleNotice(parsedLine);
+      return;
+    }
+
+    if (parsedLine.command === 'GLOBALUSERSTATE' || (parsedLine.command === 'USERSTATE' && parsedLine.params[0] === `#${this.channel}`)) {
+      this.selfColor = readTwitchNameColor(parsedLine.tags.color);
+      this.selfBadges = readChatBadges(parsedLine.tags.badges);
       return;
     }
 
@@ -301,7 +320,17 @@ export class TmcTwitchIrcClient {
       username,
       displayName,
       text,
+      color: readTwitchNameColor(parsedLine.tags.color),
+      fragments: parseTwitchMessageContent(text, parsedLine.tags.emotes),
+      reply: readChatReply({
+        parentUserId: parsedLine.tags['reply-parent-user-id'],
+        parentUsername: parsedLine.tags['reply-parent-user-login'],
+        parentMessageId: parsedLine.tags['reply-parent-msg-id'],
+        parentDisplayName: parsedLine.tags['reply-parent-display-name'] || parsedLine.tags['reply-parent-user-login'],
+        parentText: parsedLine.tags['reply-parent-msg-body'] || '',
+      }),
       isSelf: username.toLowerCase() === selfUsername,
+      ...(readChatBadges(parsedLine.tags.badges).length ? { badges: readChatBadges(parsedLine.tags.badges) } : {}),
     };
   }
 
@@ -354,7 +383,7 @@ export class TmcTwitchIrcClient {
 function normalizeChannel(channel: string): string {
   const normalized = channel.trim().replace(/^#/, '').toLowerCase();
 
-  if (!normalized) {
+  if (!/^[a-z0-9_-]{1,64}$/.test(normalized)) {
     throw new Error('Channel cannot be empty.');
   }
 
@@ -507,12 +536,15 @@ function parseTags(rawTags: string): Readonly<Record<string, string>> {
  * Decodes Twitch IRC tag escape sequences.
  */
 function unescapeTagValue(value: string): string {
-  return value
-    .replace(/\\s/g, ' ')
-    .replace(/\\:/g, ';')
-    .replace(/\\r/g, '\r')
-    .replace(/\\n/g, '\n')
-    .replace(/\\\\/g, '\\');
+  return value.replace(/\\([s:rn\\])/g, (_match, code: string) => {
+    switch (code) {
+      case 's': return ' ';
+      case ':': return ';';
+      case 'r': return '\r';
+      case 'n': return '\n';
+      default: return '\\';
+    }
+  });
 }
 
 /**

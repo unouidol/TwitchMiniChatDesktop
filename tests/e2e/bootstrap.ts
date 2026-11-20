@@ -1,4 +1,4 @@
-import { app, safeStorage, session } from 'electron';
+import { app, BrowserWindow, safeStorage, session, shell, WebContentsView } from 'electron';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,6 +22,33 @@ const backend = new URL(argument('backend'));
 assert.equal(backend.hostname, '127.0.0.1');
 assert.equal(backend.protocol, 'http:');
 const socketUrl = `${backend.origin.replace('http:', 'ws:')}/irc`;
+// Replace only the OS browser boundary. Never launch an authenticated browser.
+let browserAttempts = 0;
+const linkAttempts: string[] = [];
+shell.openExternal = async (target: string): Promise<void> => {
+  const url = new URL(target);
+  if (url.hostname === 'example.test') {
+    assert.ok([
+      'https://example.test/history?x=1&y=2', 'http://example.test/live',
+      'https://example.test/middle', 'https://example.test/keyboard', 'https://example.test/fail',
+    ].includes(target));
+    linkAttempts.push(target);
+    fs.writeFileSync(path.join(root, 'chat-link-attempts.json'), JSON.stringify({ attempts: linkAttempts }));
+    if (target === 'https://example.test/fail' && linkAttempts.filter((attempt) => attempt === target).length === 1) throw new Error('Synthetic default browser unavailable');
+    return;
+  }
+  assert.equal(url.origin, backend.origin);
+  assert.equal(url.pathname, '/oauth/start');
+  const nativePanels = BrowserWindow.getAllWindows().flatMap((window) => window.contentView.children);
+  assert.ok(nativePanels.length > 0, 'The embedded PCG view must exist while login is open');
+  for (const panel of nativePanels) {
+    assert.equal(panel.getBounds().width, 0, 'Native panel must not cover the login dialog');
+    assert.equal(panel.getBounds().height, 0);
+  }
+  browserAttempts++;
+  fs.writeFileSync(path.join(root, 'browser-attempts.json'), JSON.stringify({ browserAttempts }));
+  if (browserAttempts === 1) throw new Error('Synthetic OS browser failure');
+};
 const profile = path.join(root, 'profile');
 for (const name of ['appData', 'userData', 'sessionData', 'logs', 'crashDumps'] as const) {
   const directory = name === 'userData' || name === 'sessionData' ? profile : path.join(root, name);
@@ -41,7 +68,9 @@ function fail(message: string): never {
 
 process.on('uncaughtException', (error) => fail(error.message));
 process.on('unhandledRejection', (error: unknown) => fail(String(error)));
-const watchdog = setTimeout(() => fail('E2E Electron lifetime exceeded 120 seconds'), 120000);
+// Bound the expanded complete auth/chat/appearance/badge scenario; individual
+// production deadlines and assertion timeouts remain unchanged.
+const watchdog = setTimeout(() => fail('E2E Electron lifetime exceeded 180 seconds'), 180000);
 watchdog.unref();
 app.once('will-quit', () => clearTimeout(watchdog));
 
@@ -52,6 +81,20 @@ const guards = installNetworkGuards({
   evidencePath: path.join(root, `${phase}-network.json`),
   fail,
 });
+
+// Substitute only the Twitch HTTP boundary with the loopback fixture. The
+// existing guard still sees every actual transport destination and rejects others.
+const guardedFetch = globalThis.fetch;
+globalThis.fetch = (input, init) => {
+  const original = new URL(input instanceof Request ? input.url : String(input));
+  if (original.origin === 'https://id.twitch.tv' || original.origin === 'https://api.twitch.tv') {
+    assert.ok(['/oauth2/validate', '/helix/users', '/helix/chat/color', '/helix/chat/badges', '/helix/chat/badges/global', '/helix/chat/emotes', '/helix/chat/emotes/global', '/helix/chat/emotes/user'].includes(original.pathname));
+    const local = new URL(`/twitch${original.pathname}`, backend.origin);
+    local.search = original.search;
+    return guardedFetch(local, init);
+  }
+  return guardedFetch(input, init);
+};
 
 app.on('window-all-closed', () => app.quit());
 
@@ -67,6 +110,11 @@ void app.whenReady().then(async () => {
   const store = new TmcSecureAuthSessionStore();
   if (phase === 'first') {
     assert.equal(fs.existsSync(store.getFilePath()), false, 'First boot must use a fresh profile');
+    // Synthetic browser cookie only in B's isolated temporary partition. No login/network.
+    await session.fromPartition('persist:tmc-pcg-B').cookies.set({
+      url: 'https://www.twitch.tv', name: 'auth-token', value: 'synthetic-browser-session-B',
+      secure: true, httpOnly: true, expirationDate: Math.floor(Date.now() / 1000) + 3600,
+    });
     const { TmcAccountChannelStore } = await import('../../src/main/channels/TmcAccountChannelStore');
     const channels = new TmcAccountChannelStore(profile);
     for (const profileId of ['B', 'A']) {
@@ -98,7 +146,8 @@ void app.whenReady().then(async () => {
     desktopClientVersion: 'test',
     desktopFlavor: 'test',
     defaultHistorySeconds: 60,
-    oauthFinalizeUrl: `${backend.origin}/forbidden-finalize`,
+    oauthStartUrl: `${backend.origin}/oauth/start`,
+    oauthFinalizeUrl: `${backend.origin}/finalize`,
     oauthDesktopRestoreUrl: `${backend.origin}/restore`,
     oauthDesktopLogoutUrl: `${backend.origin}/logout`,
     oauthReturnScheme: 'desktop-claim',
@@ -106,6 +155,59 @@ void app.whenReady().then(async () => {
     chatWebSocketUrl: socketUrl,
   });
   const window = createMainWindow();
+  // Read-only native-view observation. No renderer test API or IPC substitute.
+  let previousBounds = '';
+  let boundsRevision = 0;
+  let sizeCommand = 0;
+  let cookieCommand = '';
+  let cookieCommandPending = false;
+  const boundsObservation = setInterval(() => {
+    const sizePath = path.join(root, `${phase}-window-size-${sizeCommand + 1}.json`);
+    if (fs.existsSync(sizePath)) {
+      const requested: unknown = JSON.parse(fs.readFileSync(sizePath, 'utf8'));
+      assert.ok(requested && typeof requested === 'object' && 'width' in requested && 'height' in requested);
+      const { width, height } = requested;
+      assert.ok(typeof width === 'number' && Number.isInteger(width) && width >= 960 && width <= 2000);
+      assert.ok(typeof height === 'number' && Number.isInteger(height) && height >= 650 && height <= 1400);
+      const previous = window.getBounds();
+      window.setSize(width, height);
+      fs.writeFileSync(path.join(root, `${phase}-window-size-${++sizeCommand}.ack.json`), JSON.stringify(previous));
+    }
+    if (window.isDestroyed()) return;
+    // Parent-runner control of synthetic cookie storage, never production IPC.
+    const commandPath = path.join(root, 'pcg-cookie-command');
+    if (phase === 'first' && !cookieCommandPending && fs.existsSync(commandPath)) {
+      const requested = fs.readFileSync(commandPath, 'utf8');
+      assert.ok(requested === 'present' || requested === 'missing');
+      if (requested !== cookieCommand) {
+        cookieCommandPending = true;
+        const cookies = session.fromPartition('persist:tmc-pcg-B').cookies;
+        const operation = requested === 'missing'
+          ? cookies.remove('https://www.twitch.tv', 'auth-token')
+          : cookies.set({ url: 'https://www.twitch.tv', name: 'auth-token',
+            value: 'synthetic-browser-session-B', secure: true, httpOnly: true,
+            expirationDate: Math.floor(Date.now() / 1000) + 3600 });
+        void operation.then(() => {
+          cookieCommand = requested;
+          cookieCommandPending = false;
+          fs.writeFileSync(path.join(root, 'pcg-cookie-ack'), requested);
+        }).catch(() => fail('Synthetic PCG cookie fixture change failed'));
+      }
+    }
+    const snapshot = JSON.stringify(window.contentView.children
+      .filter((view): view is WebContentsView => view instanceof WebContentsView)
+      .map((view) => ({ id: view.webContents.id, bounds: view.getBounds() })));
+    if (snapshot === previousBounds) return;
+    if (++boundsRevision > 2048) fail('Native bounds observation limit exceeded');
+    // Immutable snapshots avoid replacing a file while Windows readers hold it.
+    const destination = path.join(root, `${phase}-pcg-bounds-${boundsRevision}.json`);
+    fs.writeFileSync(`${destination}.tmp`, snapshot);
+    fs.renameSync(`${destination}.tmp`, destination);
+    previousBounds = snapshot;
+  }, 100);
+  boundsObservation.unref();
+  window.once('closed', () => clearInterval(boundsObservation));
+  app.once('will-quit', () => clearInterval(boundsObservation));
   window.once('closed', () => app.quit());
   await new Promise<void>((resolve) => window.webContents.once('did-finish-load', () => resolve()));
   const rendererSurface: unknown = await window.webContents.executeJavaScript(

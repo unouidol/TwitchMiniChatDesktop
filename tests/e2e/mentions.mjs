@@ -1,0 +1,64 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+
+export async function exerciseMentions(browser, fixture, evidence, readNativeViews) {
+  const button = await browser.$('[data-tmc-mentions]');
+  const input = await browser.$('#messageInput');
+  const row = (id) => browser.$(`[data-tmc-message-id="${id}"]`);
+  const sentBefore = fixture.sentMessages.length;
+  const nativeBefore = await readNativeViews();
+  assert.equal(await browser.$('[data-tmc-account-select]').getValue(), 'B');
+  fixture.setMentionMessages(true);
+  await browser.$('#loadHistoryButton').click();
+  await browser.waitUntil(async () => (await button.getText()) === 'Mentions (2)');
+  assert.equal(await row('mention-history-b').getAttribute('data-tmc-mention-kind'), 'mention');
+  assert.equal(await row('mention-history-a').getAttribute('data-tmc-mention-kind'), null);
+  assert.equal(await row('mention-history-both').getAttribute('data-tmc-mention-kind'), 'mention');
+  assert.equal(await row('mention-history-self-b').getAttribute('data-tmc-mention-kind'), null);
+  assert.equal(await row('mention-history-boundaries').getAttribute('data-tmc-mention-kind'), null);
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected');
+  fixture.sendMentionMessages();
+  await browser.waitUntil(async () => (await button.getText()) === 'Mentions (4)');
+  assert.equal(await row('mention-reply-B').getAttribute('data-tmc-mention-kind'), 'reply');
+  assert.equal(await row('mention-reply-A').getAttribute('data-tmc-mention-kind'), null);
+  assert.equal(await row('mention-self-B').getAttribute('data-tmc-mention-kind'), null);
+  assert.equal(await row('mention-wrong-identity').getAttribute('data-tmc-mention-kind'), null);
+  await input.setValue('draft survives mention navigation');
+  for (const id of ['mention-history-b', 'mention-history-both', 'mention-live-B', 'mention-reply-B', 'mention-history-b']) {
+    await button.click();
+    assert.equal(await browser.execute('return document.activeElement.dataset.tmcMessageId'), id);
+  }
+  assert.equal(await input.getValue(), 'draft survives mention navigation');
+  const position = await browser.execute("return document.querySelector('#chatList').scrollTop");
+  fixture.sendMentionMessages('plain');
+  await row('mention-live-plain').waitForExist();
+  assert.equal(await browser.execute("return document.querySelector('#chatList').scrollTop"), position, 'Reading an older mention does not follow incoming messages');
+  await browser.$('[data-tmc-jump-to-latest]').waitForDisplayed();
+  assert.equal(await button.getText(), 'Mentions (4)');
+  assert.deepEqual(await readNativeViews(), nativeBefore, 'Mention navigation leaves native PCG unchanged');
+  await browser.saveScreenshot(path.join(evidence, 'chat-mentions.png'));
+  await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-a'));
+  await browser.waitUntil(async () => (await button.getText()) === 'Mentions (2)');
+  assert.equal(await row('mention-history-a').getAttribute('data-tmc-mention-kind'), 'mention');
+  assert.equal(await row('mention-history-b').getAttribute('data-tmc-mention-kind'), null);
+  assert.equal(await row('mention-history-self-a').getAttribute('data-tmc-mention-kind'), null);
+  const profiles = await browser.execute("return Array.from(document.querySelectorAll('[data-tmc-attention-profile]'), (row) => row.dataset.tmcAttentionProfile)");
+  assert.ok(profiles.length === 2 && profiles.every((profile) => profile === 'A'));
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected');
+  fixture.sendMentionMessages();
+  await browser.waitUntil(async () => (await button.getText()) === 'Mentions (4)');
+  assert.equal(await row('mention-reply-A').getAttribute('data-tmc-mention-kind'), 'reply');
+  await browser.$('#openChannelButton').waitForEnabled();
+  await browser.$('#channelInput').setValue('fixture-other');
+  await browser.$('#openChannelButton').click();
+  await browser.$('#openChannelButton').waitForEnabled();
+  assert.equal(await button.getText(), 'Mentions (0)');
+  assert.equal(await button.isEnabled(), false);
+  assert.equal((await browser.$$('.tmc-message-mention')).length, 0);
+  fixture.setMentionMessages(false);
+  await browser.$('#channelInput').setValue('fixture-channel');
+  await browser.$('#openChannelButton').click();
+  await browser.$('#openChannelButton').waitForEnabled();
+  assert.equal(fixture.sentMessages.length, sentBefore, 'Mention detection/navigation never sends or replays chat');
+}

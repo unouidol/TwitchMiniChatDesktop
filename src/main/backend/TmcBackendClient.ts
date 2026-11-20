@@ -1,4 +1,7 @@
-﻿import type {
+import { parseTwitchMessageContent } from '../../shared/chat/TmcMessageContent';
+import { readTwitchNameColor } from '../../shared/chat/TmcChatNameColor';
+import { readChatBadges } from '../../shared/chat/TmcChatBadges';
+import type {
   LoadHistoryRequest,
   LoadHistoryResult,
   TmcHistoryMessage,
@@ -13,6 +16,8 @@ import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
  * known field aliases and normalizes them before exposing data to the renderer.
  */
 type RawHistoryMessage = {
+  readonly badges?: unknown;
+  readonly color?: unknown;
   readonly id?: unknown;
   readonly msg_id?: unknown;
   readonly message_id?: unknown;
@@ -29,6 +34,7 @@ type RawHistoryMessage = {
   readonly time?: unknown;
   readonly emotes_raw?: unknown;
   readonly emotesRaw?: unknown;
+  readonly emotes?: unknown;
 };
 
 /**
@@ -276,11 +282,9 @@ function normalizeHistoryMessage(
     readString(rawMessage.login) ||
     'unknown';
 
-  const text =
-    readString(rawMessage.text) ||
-    readString(rawMessage.message) ||
-    readString(rawMessage.body) ||
-    '';
+  // Emote offsets refer to the exact message, including leading/trailing spaces.
+  const text = [rawMessage.text, rawMessage.message, rawMessage.body]
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0) ?? '';
 
   const timestampMillis = readTimestampMillis(
     rawMessage.ts ?? rawMessage.timestamp ?? rawMessage.time,
@@ -293,7 +297,7 @@ function normalizeHistoryMessage(
     `${channel}-${timestampMillis}-${index}`;
 
   const emotesRaw =
-    readString(rawMessage.emotes_raw) || readString(rawMessage.emotesRaw);
+    readString(rawMessage.emotes_raw) || readString(rawMessage.emotesRaw) || readString(rawMessage.emotes);
 
   return {
     id,
@@ -301,7 +305,9 @@ function normalizeHistoryMessage(
     user,
     text,
     timestampMillis,
-    ...(emotesRaw ? { emotesRaw } : {}),
+    fragments: parseTwitchMessageContent(text, emotesRaw),
+    color: readTwitchNameColor(rawMessage.color),
+    ...(readChatBadges(rawMessage.badges).length ? { badges: readChatBadges(rawMessage.badges) } : {}),
   };
 }
 

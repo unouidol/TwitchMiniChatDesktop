@@ -53,6 +53,10 @@ for (const entry of cases) {
     await fs.writeFile(path.join(root, 'fixture-owner'), entry.fault === 'ownership' ? 'not-owned' : 'tmc-electron-account-removal');
     const attempted = [];
     const original = entry.scenarioFailure ? new Error('original scenario cause') : undefined;
+    if (original) {
+      await fs.writeFile(path.join(root, 'first-network.json.progress-2'), '{"collectionComplete":false,"sequence":2}');
+      await fs.writeFile(path.join(root, 'first-network.json.progress-8'), '{"collectionComplete":false,"sequence":8}');
+    }
     const boundaryError = Object.assign(new Error(`Expected deterministic ${entry.fault} fault`), { code: 'EIO' });
     const environment = { ELECTRON_RUN_AS_NODE: 'changed-by-scenario' };
     const inherited = entry.fault ? 'inherited-value' : undefined;
@@ -104,6 +108,10 @@ for (const entry of cases) {
         assert.equal(await fs.stat(path.join(evidence, 'result.json')).then(() => true, () => false), false);
       } else assert.equal(outcome, undefined);
       const report = JSON.parse(await fs.readFile(path.join(evidence, 'finalization.json'), 'utf8'));
+      if (original) {
+        assert.deepEqual(JSON.parse(await fs.readFile(path.join(evidence, 'first-network.progress.json'), 'utf8')), { collectionComplete: false, sequence: 8 });
+        await assert.rejects(fs.access(path.join(evidence, 'first-network.json')), { code: 'ENOENT' });
+      }
       assert.equal(report.remainingProfile, retained);
       assert.equal(report.failures.length > 0, Boolean(entry.fault));
       console.log(`Verified attempted releases: ${releases.join(', ')}; simulated resources, not real Electron leakage.`);

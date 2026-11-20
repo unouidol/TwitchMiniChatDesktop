@@ -1,9 +1,10 @@
-﻿import { TMC_ACCOUNT_CHANGED_EVENT } from '../accounts/initializeAccountSwitcher';
+import { TMC_ACCOUNT_CHANGED_EVENT, TMC_ACCOUNT_MENU_CHANGED_EVENT } from '../accounts/initializeAccountSwitcher';
 import {
   TMC_AUTH_LOGGED_IN_EVENT,
   TMC_CHANNEL_CHANGED_EVENT,
 } from '../chat/TmcChannelChatController';
 import type { TmcPcgStatus } from '../../shared/pcg/TmcPcgModels';
+import { TMC_AUTH_DIALOG_CHANGED_EVENT } from '../auth/initializeAuthPanel';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
 
 const MIN_PCG_VIEW_SIZE = 20;
@@ -21,19 +22,40 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
   const statusElement = ensureStatusElement(panel);
   const loginButton =
     panel?.querySelector<HTMLButtonElement>('[data-tmc-pcg-login]') || null;
+  const quickLoginButton = panel?.querySelector<HTMLButtonElement>('[data-tmc-pcg-login-quick]');
+  const signInPrompt = panel?.querySelector<HTMLElement>('[data-tmc-pcg-sign-in]');
+  const signInDescription = panel?.querySelector<HTMLElement>('[data-tmc-pcg-sign-in-description]');
   const detachButton =
     panel?.querySelector<HTMLButtonElement>('[data-tmc-pcg-detach]') || null;
   const detachedPlaceholder = ensureDetachedPlaceholder(host);
+  const menu = panel?.querySelector<HTMLDetailsElement>('[data-tmc-pcg-menu]');
+  const lifetime = new AbortController();
+  const closeMenu = (): void => {
+    if (menu) menu.open = false;
+  };
   let currentDisplayMode: TmcPcgStatus['displayMode'] = 'embedded';
   let lastKnownChannel = readChannelFromInput();
   let frameHandle: number | null = null;
+  let loginPending = false;
 
   if (loginButton) {
     loginButton.disabled = true;
   }
 
   const renderStatus = (status: TmcPcgStatus): void => {
+    const accountSelect = document.querySelector<HTMLSelectElement>('[data-tmc-account-select]');
+    if (status.profileId && accountSelect && status.profileId !== accountSelect.value) return;
     currentDisplayMode = status.displayMode;
+    if (panel) panel.dataset.tmcPcgTwitchAuth = status.twitchAuth;
+    if (signInPrompt) {
+      const wasHidden = signInPrompt.hidden;
+      signInPrompt.hidden = status.state !== 'active' || status.twitchAuth === 'session-present';
+      if (wasHidden !== signInPrompt.hidden) scheduleBoundsSync();
+    }
+    if (signInDescription) signInDescription.textContent = status.twitchAuth === 'unknown'
+      ? 'We could not confirm a Twitch session for the game. You can sign in here; chat login is separate.'
+      : 'The game needs its own Twitch sign-in, separate from chat.';
+    if (quickLoginButton) quickLoginButton.disabled = status.state !== 'active' || loginPending;
     host?.classList.toggle('tmc-pcg-host-detached', status.displayMode === 'detached');
 
     if (detachedPlaceholder) {
@@ -45,7 +67,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     }
 
     if (loginButton) {
-      loginButton.disabled = status.state !== 'active';
+      loginButton.disabled = status.state !== 'active' || loginPending;
     }
   };
 
@@ -63,7 +85,10 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     };
 
     try {
-      if (bounds.width <= MIN_PCG_VIEW_SIZE || bounds.height <= MIN_PCG_VIEW_SIZE) {
+      const loginDialog = document.querySelector<HTMLDialogElement>('[data-tmc-auth-dialog]');
+      const accountMenu = document.querySelector<HTMLDetailsElement>('[data-tmc-account-menu]');
+      if (menu?.open || accountMenu?.open || loginDialog?.open || loginDialog?.dataset.opening === 'true' ||
+          bounds.width <= MIN_PCG_VIEW_SIZE || bounds.height <= MIN_PCG_VIEW_SIZE) {
         await tmc.pcg.hideView();
         return;
       }
@@ -85,6 +110,20 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     });
   };
 
+  menu?.addEventListener('toggle', scheduleBoundsSync, { signal: lifetime.signal });
+  menu?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    closeMenu();
+    menu.querySelector('summary')?.focus();
+    event.preventDefault();
+  }, { signal: lifetime.signal });
+  menu?.addEventListener('focusout', (event) => {
+    if (event.relatedTarget instanceof Node && !menu.contains(event.relatedTarget)) closeMenu();
+  }, { signal: lifetime.signal });
+  document.addEventListener('pointerdown', (event) => {
+    if (event.target instanceof Node && !menu?.contains(event.target)) closeMenu();
+  }, { signal: lifetime.signal });
+
   const activatePcg = async (channelOverride?: string | null): Promise<void> => {
     const channel = normalizeChannel(
       channelOverride || lastKnownChannel || readChannelFromInput() || '',
@@ -98,6 +137,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
 
     try {
       renderStatus({
+        twitchAuth: 'unknown',
         state: 'loading',
         displayMode: currentDisplayMode,
         profileId: null,
@@ -117,6 +157,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
       await syncBoundsNow();
     } catch (error) {
       renderStatus({
+        twitchAuth: 'unknown',
         state: 'error',
         displayMode: currentDisplayMode,
         profileId: null,
@@ -134,13 +175,22 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     renderStatus(status);
   });
 
-  loginButton?.addEventListener('click', async () => {
-    loginButton.disabled = true;
+  const openLogin = async (): Promise<void> => {
+    if (loginPending) return;
+    loginPending = true;
+    closeMenu();
+    menu?.querySelector('summary')?.focus();
+    if (loginButton) loginButton.disabled = true;
+    if (quickLoginButton) quickLoginButton.disabled = true;
 
     try {
-      renderStatus(await tmc.pcg.openTwitchLogin());
+      const status = await tmc.pcg.openTwitchLogin();
+      loginPending = false;
+      renderStatus(status);
     } catch (error) {
+      loginPending = false;
       renderStatus({
+        twitchAuth: 'unknown',
         state: 'error',
         displayMode: currentDisplayMode,
         profileId: null,
@@ -148,15 +198,20 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
         message: getErrorMessage(error),
       });
     }
-  });
+  };
+  loginButton?.addEventListener('click', openLogin);
+  quickLoginButton?.addEventListener('click', openLogin, { signal: lifetime.signal });
 
   detachButton?.addEventListener('click', async () => {
+    closeMenu();
+    menu?.querySelector('summary')?.focus();
     detachButton.disabled = true;
 
     try {
       renderStatus(await tmc.pcg.openDetachedWindow());
     } catch (error) {
       renderStatus({
+        twitchAuth: 'unknown',
         state: 'error',
         displayMode: currentDisplayMode,
         profileId: null,
@@ -176,6 +231,13 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
   }
 
   window.addEventListener('resize', scheduleBoundsSync);
+  window.addEventListener(TMC_AUTH_DIALOG_CHANGED_EVENT, scheduleBoundsSync);
+  window.addEventListener(TMC_ACCOUNT_MENU_CHANGED_EVENT, scheduleBoundsSync);
+  window.addEventListener('pagehide', () => {
+    lifetime.abort();
+    window.removeEventListener(TMC_AUTH_DIALOG_CHANGED_EVENT, scheduleBoundsSync);
+    window.removeEventListener(TMC_ACCOUNT_MENU_CHANGED_EVENT, scheduleBoundsSync);
+  }, { once: true });
   window.addEventListener(TMC_ACCOUNT_CHANGED_EVENT, () => {
     void activatePcg(lastKnownChannel);
   });
@@ -205,6 +267,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     .then(() => activatePcg(lastKnownChannel))
     .catch((error) => {
       renderStatus({
+        twitchAuth: 'unknown',
         state: 'error',
         displayMode: currentDisplayMode,
         profileId: null,
