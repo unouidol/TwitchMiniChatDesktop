@@ -406,7 +406,8 @@ button:focus-visible, summary:focus-visible, select:focus-visible {
   position: relative;
   display: flex;
   flex: 1;
-  min-height: 0;
+  min-height: 180px;
+  flex-shrink: 0;
 }
 
 .tmc-chat-list {

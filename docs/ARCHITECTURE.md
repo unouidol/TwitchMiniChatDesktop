@@ -202,7 +202,9 @@ channel entitlement is unknown and personal emotes are unavailable.
 The EMOTE_CATALOG handler accepts only the trusted local main frame and validates
 profile/channel payloads; the service captures the initiating session. The
 integrated emote section sits below the message feed and above the composer, occupies
-at most40% of the chat column and scrolls its own grid. It has no dialog, backdrop
+at most 40% of the chat column and scrolls its own grid. The feed reserves at
+least 180px so a wrapped toolbar on narrow Windows desktops shrinks the picker
+instead of making messages unreadable. It has no dialog, backdrop
 or focus trap; chat/composer/account controls and PCG remain available. The toggle
 announces expansion, while X/Escape/toggle hide it. Choosing an emote inserts at
 the composer's current selection and keeps the panel open for further selection;
