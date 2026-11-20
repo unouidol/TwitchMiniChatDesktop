@@ -11,6 +11,7 @@ export function installNetworkGuards(options: {
   rendererRoot: string;
   evidencePath: string;
   fail: (message: string) => never;
+  playerSource?: () => { origin: string; pathname: string; channel: string | null } | null;
 }) {
   const evidence = {
     schemaVersion: 1,
@@ -89,7 +90,11 @@ export function installNetworkGuards(options: {
       const url = new URL(details.url);
       const localAsset = url.protocol === 'file:' &&
         fileURLToPath(url).startsWith(path.resolve(options.rendererRoot) + path.sep);
-      const allowed = localAsset || url.origin === options.backendOrigin || url.href === 'about:blank';
+      const player = options.playerSource?.();
+      const ownedPlayer = player && url.protocol === 'http:' && url.hostname === 'localhost' && url.origin === player.origin &&
+        /^\/player\/[a-f0-9]{48}$/.test(player.pathname) && url.pathname === player.pathname &&
+        details.method === 'GET' && [...url.searchParams.keys()].length === 1 && url.searchParams.get('channel') === player.channel;
+      const allowed = Boolean(localAsset || url.origin === options.backendOrigin || url.href === 'about:blank' || ownedPlayer);
       observe('chromium', url, allowed);
       callback({ cancel: !allowed });
       if (!allowed) reject('Forbidden Chromium request destination');

@@ -6,6 +6,27 @@ The maintainer remains responsible for reviewing and accepting each change.
 
 ## Local setup and checks
 
+Player unit tests exercise the actual loopback source's path/channel validation,
+CSP, retired documents and listener closure, plus manager ownership with Electron
+boundaries substituted: reparenting versus destruction, memory-session cleanup,
+stale creation/cancellation, disappearing native getters, modal occlusion before
+creation, permission/navigation denial and load deadlines. Player IPC rejects
+foreign frames, malformed contexts, dimensions and occlusion payloads.
+Synthetic Electron retains the actual document server and native view lifecycle;
+only the official Twitch frame origin constant is replaced at build time with an
+inert loopback fixture. The Chromium guard additionally permits only the current
+owned localhost origin, unpredictable path and selected channel; retired/other
+destinations remain forbidden. Playback observations record status, actual view
+IDs/bounds/destruction and a one-time capability observation of the app-owned
+local wrapper (never remote Twitch or PCG DOM). Tests keep provider playback
+substitution distinct from real-video evidence, and check held loading/modal
+occlusion, resizing, channel drafts/history refresh, reparenting, account changes,
+window-close cleanup, independent PCG and no chat sends. App shutdown with video
+still active is exercised; source/view cleanup observations are retained without
+credentials or provider DOM. Native window resizing/closing
+uses bounded commands in the test-owned root because this Electron build lacks
+ChromeDriver's native-window-size CDP command; no production test IPC is added.
+
 Search tests cover literal/Unicode/case matching, author and original emote-code
 lookup, both navigation directions, live arrivals without navigation, draft
 preservation, bounded retention/eviction disclosure and reset/dispose. Synthetic

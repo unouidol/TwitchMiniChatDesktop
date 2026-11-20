@@ -14,6 +14,7 @@ import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
 import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
 import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
 import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
+import type { TmcPlayerContext, TmcPlayerLayoutRequest, TmcPlayerMode, TmcPlayerOpenRequest, TmcPlayerStatus } from '../shared/player/TmcPlayerModels';
 import type {
   FinalizeTwitchLoginRequest,
   FinalizeTwitchLoginResult,
@@ -345,6 +346,15 @@ export type TmcPreloadApi = {
    */
   readonly settings: TmcSettingsPreloadApi;
   readonly badges: { readonly getCatalog: (request: TmcBadgeRequest) => Promise<TmcBadgeCatalog> };
+  readonly player: {
+    readonly occlude: (request: { hidden: boolean }) => Promise<void>;
+    readonly open: (request: TmcPlayerOpenRequest) => Promise<TmcPlayerStatus>;
+    readonly getStatus: () => Promise<TmcPlayerStatus>;
+    readonly layout: (request: TmcPlayerLayoutRequest) => Promise<TmcPlayerStatus>;
+    readonly setMode: (request: TmcPlayerContext & { mode: TmcPlayerMode }) => Promise<TmcPlayerStatus>;
+    readonly close: (request: TmcPlayerContext) => Promise<TmcPlayerStatus>;
+    readonly onStatusChanged: (callback: (status: TmcPlayerStatus) => void) => () => void;
+  };
 
   /**
    * Passive PCG operations available to the local UI.
@@ -717,6 +727,15 @@ function createTmcPreloadApi(): TmcPreloadApi {
     },
 
     badges: { getCatalog: (request: TmcBadgeRequest): Promise<TmcBadgeCatalog> => ipcRenderer.invoke(TMC_IPC_CHANNELS.CHAT_BADGES, request) },
+    player: {
+      occlude: (request: { hidden: boolean }): Promise<void> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_OCCLUDE, request),
+      open: (request: TmcPlayerOpenRequest): Promise<TmcPlayerStatus> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_OPEN, request),
+      getStatus: (): Promise<TmcPlayerStatus> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_STATUS),
+      layout: (request: TmcPlayerLayoutRequest): Promise<TmcPlayerStatus> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_LAYOUT, request),
+      setMode: (request: TmcPlayerContext & { mode: TmcPlayerMode }): Promise<TmcPlayerStatus> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_MODE, request),
+      close: (request: TmcPlayerContext): Promise<TmcPlayerStatus> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_CLOSE, request),
+      onStatusChanged: (callback: (status: TmcPlayerStatus) => void): (() => void) => subscribeToIpcEvent(TMC_IPC_CHANNELS.PLAYER_CHANGED, callback),
+    },
 
     pcg: {
       activate: async (

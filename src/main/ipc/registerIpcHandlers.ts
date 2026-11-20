@@ -29,6 +29,8 @@ import { registerChatLinkIpcHandlers } from './registerChatLinkIpcHandlers';
 import { chatAttention } from '../../shared/chat/TmcChatAttention';
 import { TmcBadgeCatalogService } from '../chat/TmcBadgeCatalogService';
 import { registerBadgeIpcHandlers } from './registerBadgeIpcHandlers';
+import { TmcPlayerManager } from '../player/TmcPlayerManager';
+import { registerPlayerIpcHandlers } from './registerPlayerIpcHandlers';
 import { JsonFileStore } from '../storage/JsonFileStore';
 import path from 'node:path';
 
@@ -41,7 +43,7 @@ import path from 'node:path';
  */
 export async function registerIpcHandlers(
   runtimeConfig: TmcRuntimeConfig,
-): Promise<void> {
+): Promise<{ player: TmcPlayerManager }> {
   const authSessionStore = new TmcAuthSessionStore();
   const secureAuthSessionStore = new TmcSecureAuthSessionStore();
   const accountRegistry = new TmcAccountSessionRegistry(
@@ -106,6 +108,11 @@ export async function registerIpcHandlers(
   });
   registerSettingsIpcHandlers();
   registerBackendIpcHandlers(runtimeConfig, authSessionStore, accountRegistry);
+  const player = new TmcPlayerManager(() => accountRegistry.getActiveSession()?.profileId || null, (status) => {
+    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(TMC_IPC_CHANNELS.PLAYER_CHANGED, status);
+  });
+  registerPlayerIpcHandlers(player);
+  return { player };
 }
 
 async function restoreSavedDesktopSessions(

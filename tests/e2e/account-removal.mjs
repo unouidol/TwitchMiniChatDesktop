@@ -18,6 +18,7 @@ import { exerciseAppearance, verifyAppearanceRestart } from './appearance.mjs';
 import { exerciseTimestamps } from './timestamps.mjs';
 import { exerciseBadges } from './badges.mjs';
 import { exerciseSearch } from './search.mjs';
+import { exercisePlayer } from './player.mjs';
 import { appVersionPlugin } from '../../build/appVersion.mjs';
 import { observeDriverTraffic, provenance, verifyDriver } from './driver.mjs';
 import { verifyNetworkEvidence } from './network-evidence.mjs';
@@ -79,6 +80,20 @@ async function readNativeViews() {
   const snapshots = (await fs.readdir(root)).filter((name) => /^first-pcg-bounds-\d+\.json$/.test(name));
   snapshots.sort((a, b) => Number(a.match(/(\d+)\.json$/)[1]) - Number(b.match(/(\d+)\.json$/)[1]));
   return snapshots.length ? JSON.parse(await fs.readFile(path.join(root, snapshots.at(-1)), 'utf8')) : [];
+}
+
+async function readPlayback() {
+  const files = (await fs.readdir(root)).filter((name) => /^first-playback-\d+\.json$/.test(name));
+  files.sort((a, b) => Number(a.match(/(\d+)\.json$/)[1]) - Number(b.match(/(\d+)\.json$/)[1]));
+  return files.length ? JSON.parse(await fs.readFile(path.join(root, files.at(-1)), 'utf8')) : null;
+}
+async function closeOwnedPlayerWindow() {
+  const command = path.join(root, 'first-close-player');
+  await fs.writeFile(command, 'close-owned-detached-player', { flag: 'wx' });
+  await waitFor(async () => {
+    try { await fs.access(`${command}.ack`); return true; }
+    catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+  }, 'owned detached player close');
 }
 
 // ChromeDriver's Browser.getWindowForTarget is unavailable for this Electron
@@ -187,6 +202,7 @@ try {
     envFile: false,
     define: { MAIN_WINDOW_VITE_DEV_SERVER_URL: 'undefined', MAIN_WINDOW_VITE_NAME: '"main_window"' },
   };
+  fixture = await startFixture();
   await build({ ...shared, build: {
     outDir: path.join(output, 'build'),
     emptyOutDir: false,
@@ -194,7 +210,12 @@ try {
     rollupOptions: {
       external: ['electron', ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
       output: { inlineDynamicImports: true },
-      plugins: [{ name: 'reject-real-config', resolveId(source) {
+      plugins: [{ name: 'local-player-frame', enforce: 'pre', transform(code, id) {
+        if (!id.replaceAll('\\', '/').endsWith('/src/main/player/TmcPlayerDocument.ts')) return;
+        const boundary = 'https://player.twitch.tv';
+        assert.equal(code.split(boundary).length, 2, 'Only the official player frame HTTP origin is substituted');
+        return code.replace(boundary, `${fixture.origin}/player-frame`);
+      } }, { name: 'reject-real-config', resolveId(source) {
         if (source.endsWith('/TmcRuntimeConfig') || source.includes('LocalPropertiesReader')) {
           throw new Error('E2E bootstrap must not import real runtime configuration');
         }
@@ -209,7 +230,6 @@ try {
   await build({ configFile: false, envFile: false, root: project, base: './',
     plugins: [appVersionPlugin('e2e')],
     build: { outDir: path.join(output, 'renderer/main_window'), emptyOutDir: false } });
-  fixture = await startFixture();
   const first = await launch('first');
   assert.deepEqual((await options()).sort(), ['A', 'B']);
   assert.ok(['A', 'B'].includes(first.startupPreferredProfileId));
@@ -245,6 +265,8 @@ try {
   await exerciseMentions(browser, fixture, evidence, readNativeViews);
   await exerciseBadges(browser, fixture, evidence, readNativeViews);
   await exerciseSearch(browser, fixture, evidence, readNativeViews);
+  await exercisePlayer(browser, fixture, evidence, readNativeViews, readPlayback, resizeOwnedWindow, closeOwnedPlayerWindow);
+  await fs.writeFile(path.join(evidence, 'player-lifecycle.json'), JSON.stringify(await readPlayback(), null, 2));
   await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
   await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-a'),
     { timeout: 20000, timeoutMsg: 'UI selected-account display should show A' });
@@ -261,6 +283,10 @@ try {
   assert.deepEqual(fixture.requests.filter((entry) => entry.path === '/logout').map((entry) => entry.profileId), ['A']);
   const encrypted = await fs.readFile(path.join(root, 'profile/tmc-desktop-auth-sessions.json'), 'utf8');
   assert.equal(encrypted.includes('synthetic-desktop-'), false);
+  await browser.$('[data-tmc-player-toggle]').waitForEnabled();
+  await browser.$('[data-tmc-player-toggle]').click();
+  await browser.waitUntil(async () => (await readPlayback()).status.state === 'ready' && (await readPlayback()).sourceActive);
+  await fs.writeFile(path.join(evidence, 'player-active-at-exit.json'), JSON.stringify(await readPlayback(), null, 2));
   await closeApplication(first);
   const firstNetwork = await readNetworkEvidence('first');
   const restarted = await launch('restart');

@@ -5,6 +5,45 @@ It is an orientation aid; inspect code and callers before changing behavior.
 
 ## Current boundaries
 
+Live video is opt-in through Show live for the actually opened channel. The
+renderer measures a resizable host above chat; main owns one TmcPlayerManager,
+one playback WebContentsView and at most one separate video window. It embeds
+only with at least 400x300 video pixels and 180px remaining feed space. Otherwise
+it opens/moves to a separate window without stealing focus; returning inline is
+explicit. Moving reparents the same WebContents rather than reloading playback.
+Closing either control or the separate window destroys media and closes its
+source; account changes replace the anonymous playback context, while channel
+changes navigate the owned view. Refreshing history never restarts the same video.
+
+TmcPlayerDocument serves a script-free document from an ephemeral IPv4 loopback
+listener, addressed as localhost with an unpredictable path and validated channel.
+Host/path/method/channel checks, no-store headers and a restrictive CSP limit it
+to the official Twitch iframe. This provides an actual localhost parent even
+when the packaged shell uses file URLs; no frame-ancestor headers are stripped.
+The remote video surface has no preload or Node bridge; sandboxing, context
+isolation and web security stay enabled. Popups, top-level navigation and session
+permissions are denied. Playback uses one bounded, nonpersistent anonymous
+partition, cleared on close/account replacement, separate from chat and PCG
+authentication. If Twitch requires sign-in, Open on Twitch uses the existing
+validated browser-link operation; player login is not inferred from chat login.
+
+Typed trusted-main-frame IPC validates context, dimensions and window bounds.
+Queued operations carry request revisions and initiating account/channel; a
+pending open can be cancelled and an old close cannot cancel a newer context.
+The manager captures WebContents ownership before native teardown, awaits actual
+destruction and bounds loading to 15 seconds. Global owner-window occlusion is
+recorded even before view creation: login opening awaits video/PCG hiding, and
+account menus hide/mute the embedded player throughout loading. Restoring the
+same view preserves its prior native audio mute state. The detached player is a
+separate surface. Renderer observers, frames and subscriptions are disposed on
+pagehide; main owns source/session cleanup on close and application shutdown.
+The quit coordinator waits for serialized cleanup before Electron tears down
+sessions, with a ten-second failure deadline and an explicit non-success exit
+path. Closing the application while video is active is covered separately from
+closing the player controls.
+"Ready" means the local player document loaded, not proof a channel is live;
+Twitch owns offline, ads, quality, volume and playback states in the iframe.
+
 The shell follows the actual client viewport inside a 960x650 outer-window
 minimum, accounting for Windows frame borders; the document itself does not
 scroll. Sidebar, message feed and catalogs own their scrolling. This
