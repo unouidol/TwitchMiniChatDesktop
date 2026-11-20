@@ -99,7 +99,7 @@ export class TmcAuthBrokerClient {
   ): Promise<TmcAuthSession> {
     const response = await postOAuthJson(this.config, this.config.oauthFinalizeUrl, {
       login_token: loginToken,
-    });
+    }, AbortSignal.timeout(10_000));
     const rawJson = (await response.json()) as RawOAuthFinalizeResponse;
 
     if (!response.ok) {

@@ -9,6 +9,11 @@ export const TMC_IPC_CHANNELS = {
    * Diagnostic ping from the renderer to the main process.
    */
   appPing: 'tmc:app:ping',
+  EMOTE_CATALOG: 'tmc:emotes:catalog',
+  CHAT_USER_COLORS: 'tmc:chat:user-colors',
+  CHAT_OPEN_LINK: 'tmc:chat:open-link',
+  CHAT_BADGES: 'tmc:chat:badges',
+  SETTINGS_SET_CHAT_APPEARANCE: 'tmc:settings:set-chat-appearance',
 
   /**
    * Loads cached Twitch chat history from the TMC backend.
@@ -199,6 +204,3 @@ export const TMC_IPC_CHANNELS = {
  */
 export type TmcIpcChannel =
   (typeof TMC_IPC_CHANNELS)[keyof typeof TMC_IPC_CHANNELS];
-
-
-  

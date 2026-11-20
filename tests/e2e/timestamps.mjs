@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import { settledNativeViews } from './native-layout.mjs';
+
+export async function exerciseTimestamps(browser, fixture, readNativeViews) {
+  const sentBefore = fixture.sentMessages.length;
+  fixture.setMentionMessages(true);
+  await browser.$('#loadHistoryButton').click();
+  const row = await browser.$('[data-tmc-message-id="mention-history-b"]');
+  await row.waitForExist();
+  const nativeBefore = await settledNativeViews(browser, readNativeViews);
+  await browser.$('[data-tmc-chat-appearance] summary').click();
+  const toggle = await browser.$('#chatTimestamps');
+  await toggle.waitForEnabled();
+  assert.equal(await toggle.isSelected(), true);
+  assert.equal(await row.$('time').isDisplayed(), true);
+  const dateTime = await row.$('time').getAttribute('datetime');
+  await toggle.click();
+  await toggle.waitForEnabled();
+  assert.equal(await row.$('time').isDisplayed(), false);
+  assert.equal(await row.$('time').getAttribute('datetime'), dateTime, 'Visibility retains the original timestamp');
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected');
+  fixture.sendMentionMessages('plain');
+  const live = await browser.$('[data-tmc-message-id="mention-live-plain"]');
+  await live.waitForExist();
+  assert.equal(await live.$('time').isDisplayed(), false, 'New live messages inherit the saved choice');
+  await toggle.click();
+  await toggle.waitForEnabled();
+  assert.equal(await row.$('time').isDisplayed(), true);
+  assert.equal(await live.$('time').isDisplayed(), true);
+  await toggle.click();
+  await toggle.waitForEnabled();
+  assert.equal(await browser.$('#chatFontSize').getValue(), '18');
+  assert.equal(await browser.$('#chatDensity').getValue(), 'compact');
+  assert.deepEqual(await settledNativeViews(browser, readNativeViews), nativeBefore);
+  assert.equal(fixture.sentMessages.length, sentBefore);
+  await browser.$('[data-tmc-chat-appearance] summary').click();
+  fixture.setMentionMessages(false);
+  await browser.$('#loadHistoryButton').click();
+  await browser.$('#loadHistoryButton').waitForEnabled();
+}

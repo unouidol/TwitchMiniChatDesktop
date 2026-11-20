@@ -169,6 +169,7 @@ async function resolveActivationRequest(
       ok: false,
       status: {
         state: 'empty',
+        twitchAuth: 'unknown',
         displayMode: 'embedded',
         profileId: null,
         channel: null,
@@ -185,6 +186,7 @@ async function resolveActivationRequest(
       ok: false,
       status: {
         state: 'empty',
+        twitchAuth: 'unknown',
         displayMode: 'embedded',
         profileId,
         channel: null,

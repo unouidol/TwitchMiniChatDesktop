@@ -9,6 +9,7 @@ import { appendLocalMessage } from '../chat/appendLocalMessage';
  * Window event emitted after the active desktop account changes.
  */
 export const TMC_ACCOUNT_CHANGED_EVENT = 'tmc:account:changed';
+export const TMC_ACCOUNT_MENU_CHANGED_EVENT = 'tmc:account:menu-changed';
 
 /**
  * Window event emitted after one desktop account is removed locally.
@@ -31,7 +32,27 @@ export function initializeAccountSwitcher(
     return;
   }
 
+  const lifetime = new AbortController();
+  const closeMenu = (): void => { elements.menu.open = false; };
+  elements.menu.addEventListener('toggle', () => {
+    window.dispatchEvent(new Event(TMC_ACCOUNT_MENU_CHANGED_EVENT));
+  }, { signal: lifetime.signal });
+  document.addEventListener('pointerdown', (event) => {
+    if (event.target instanceof Node && !elements.menu.contains(event.target)) closeMenu();
+  }, { signal: lifetime.signal });
+  elements.menu.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    closeMenu();
+    elements.menu.querySelector('summary')?.focus();
+    event.preventDefault();
+  }, { signal: lifetime.signal });
+  elements.menu.addEventListener('focusout', (event) => {
+    if (event.relatedTarget instanceof Node && !elements.menu.contains(event.relatedTarget)) closeMenu();
+  }, { signal: lifetime.signal });
+  window.addEventListener('pagehide', () => lifetime.abort(), { once: true });
+
   elements.select.addEventListener('change', async () => {
+    closeMenu();
     const profileId = elements.select.value;
 
     if (!profileId) {
@@ -53,6 +74,8 @@ export function initializeAccountSwitcher(
 
   elements.removeButton.addEventListener('click', async () => {
     const profileId = elements.select.value;
+    closeMenu();
+    elements.menu.querySelector('summary')?.focus();
 
     if (!profileId || !window.confirm(REMOVE_ACCOUNT_CONFIRM_MESSAGE)) {
       return;
@@ -83,10 +106,10 @@ export function initializeAccountSwitcher(
 }
 
 type AccountSwitcherElements = {
-  readonly panel: HTMLElement;
   readonly status: HTMLElement;
   readonly select: HTMLSelectElement;
   readonly removeButton: HTMLButtonElement;
+  readonly menu: HTMLDetailsElement;
 };
 
 async function refreshAccounts(
@@ -99,6 +122,10 @@ async function refreshAccounts(
   } catch (error) {
     elements.status.textContent = getErrorMessage(error);
     elements.select.replaceChildren();
+    const option = document.createElement('option');
+    option.textContent = 'Accounts unavailable';
+    option.value = '';
+    elements.select.appendChild(option);
     setControlsDisabled(elements, true);
   }
 }
@@ -110,8 +137,11 @@ function renderAccountList(
   elements.select.replaceChildren();
 
   if (result.accounts.length === 0) {
+    const option = document.createElement('option');
+    option.textContent = 'No saved accounts';
+    option.value = '';
+    elements.select.appendChild(option);
     elements.status.textContent = 'No saved accounts.';
-    updateAuthStatusText('Not logged in.');
     setControlsDisabled(elements, true);
     return;
   }
@@ -132,12 +162,10 @@ function renderAccountList(
   if (result.activeAccount) {
     const message = `Active account: ${result.activeAccount.username}`;
     elements.status.textContent = message;
-    updateAuthStatusText(`Logged in as ${result.activeAccount.username}.`);
     return;
   }
 
   elements.status.textContent = 'No active account.';
-  updateAuthStatusText('Not logged in.');
 }
 
 function renderActiveAccountResult(
@@ -147,91 +175,16 @@ function renderActiveAccountResult(
   elements.status.textContent = result.activeAccount
     ? `Active account: ${result.activeAccount.username}`
     : result.message;
-  updateAuthStatusText(result.message);
 }
 
 function resolveAccountSwitcherElements(): AccountSwitcherElements | null {
-  const headerActions = document.querySelector<HTMLElement>('.tmc-header-actions');
-
-  if (!headerActions) {
-    return null;
-  }
-
-  const existingPanel = document.querySelector<HTMLElement>('[data-tmc-account-switcher]');
-
-  if (existingPanel) {
-    return {
-      panel: existingPanel,
-      status: existingPanel.querySelector<HTMLElement>('[data-tmc-account-status]') ||
-        createAccountStatus(existingPanel),
-      select: existingPanel.querySelector<HTMLSelectElement>('[data-tmc-account-select]') ||
-        createAccountSelect(existingPanel),
-      removeButton:
-        existingPanel.querySelector<HTMLButtonElement>('[data-tmc-remove-local-account]') ||
-        createRemoveLocalButton(existingPanel),
-    };
-  }
-
-  const panel = document.createElement('section');
-  panel.className = 'tmc-account-switcher';
-  panel.dataset.tmcAccountSwitcher = 'true';
-
-  const title = document.createElement('h2');
-  title.className = 'tmc-auth-title';
-  title.textContent = 'Accounts';
-
-  const status = createAccountStatus(panel);
-  const select = createAccountSelect(panel);
-  const removeButton = createRemoveLocalButton(panel);
-
-  panel.prepend(title);
-  headerActions.appendChild(panel);
-
-  return {
-    panel,
-    status,
-    select,
-    removeButton,
-  };
-}
-
-function createAccountStatus(panel: HTMLElement): HTMLElement {
-  const status = document.createElement('p');
-  status.className = 'tmc-auth-status';
-  status.dataset.tmcAccountStatus = 'true';
-  status.textContent = 'Loading accounts...';
-  panel.appendChild(status);
-
-  return status;
-}
-
-function createAccountSelect(panel: HTMLElement): HTMLSelectElement {
-  const label = document.createElement('label');
-  label.className = 'tmc-field-label';
-  label.textContent = 'Active account';
-
-  const select = document.createElement('select');
-  select.className = 'tmc-text-input';
-  select.dataset.tmcAccountSelect = 'true';
-  select.disabled = true;
-
-  label.appendChild(select);
-  panel.appendChild(label);
-
-  return select;
-}
-
-function createRemoveLocalButton(panel: HTMLElement): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'tmc-button tmc-button-secondary tmc-remove-account-button';
-  button.dataset.tmcRemoveLocalAccount = 'true';
-  button.textContent = 'Remove from this device';
-  button.disabled = true;
-
-  panel.appendChild(button);
-
-  return button;
+  const panel = document.querySelector<HTMLElement>('[data-tmc-account-switcher]');
+  const status = panel?.querySelector<HTMLElement>('[data-tmc-account-status]');
+  const select = panel?.querySelector<HTMLSelectElement>('[data-tmc-account-select]');
+  const removeButton = panel?.querySelector<HTMLButtonElement>('[data-tmc-remove-local-account]');
+  const menu = panel?.querySelector<HTMLDetailsElement>('[data-tmc-account-menu]');
+  if (!panel || !status || !select || !removeButton || !menu) return null;
+  return { status, select, removeButton, menu };
 }
 
 function setControlsDisabled(
@@ -240,16 +193,6 @@ function setControlsDisabled(
 ): void {
   elements.select.disabled = disabled;
   elements.removeButton.disabled = disabled || !elements.select.value;
-}
-
-function updateAuthStatusText(message: string): void {
-  const authStatusElement = document.querySelector<HTMLElement>(
-    '[data-tmc-auth-status]',
-  );
-
-  if (authStatusElement) {
-    authStatusElement.textContent = message;
-  }
 }
 
 function getErrorMessage(error: unknown): string {

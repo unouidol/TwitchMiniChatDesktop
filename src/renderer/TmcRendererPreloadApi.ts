@@ -5,6 +5,9 @@ import type {
   TmcSetActiveAccountRequest,
 } from '../shared/accounts/TmcAccountModels';
 import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
+import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
+import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
+import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
 
 import type {
   TmcActiveAccountChannelStateResult,
@@ -32,6 +35,7 @@ import type {
 import type {
   SetCurrentChannelRequest,
   TmcDesktopSettings,
+  TmcChatAppearance,
 } from '../shared/settings/TmcSettingsModels';
 import type {
   TmcPcgActivateRequest,
@@ -47,6 +51,7 @@ import type {
  * Renderer-side view of the safe preload bridge.
  */
 export type TmcRendererPreloadApi = {
+  readonly emotes: { readonly getCatalog: (request: TmcEmoteCatalogRequest) => Promise<TmcEmoteCatalog> };
   /**
    * Returns basic application information for the local UI.
    */
@@ -120,6 +125,8 @@ export type TmcRendererPreloadApi = {
    * Live chat operations available to the local UI.
    */
   readonly chat: {
+    readonly openLink: (request: { readonly url: string }) => Promise<void>;
+    readonly getUserColors: (request: TmcUserColorsRequest) => Promise<TmcUserColorsResult>;
     readonly connectLive: (
       request: TmcConnectLiveChatRequest,
     ) => Promise<TmcChatLiveStatus>;
@@ -141,7 +148,9 @@ export type TmcRendererPreloadApi = {
   /**
    * Settings operations available to the local UI.
    */
+  readonly badges: { readonly getCatalog: (request: TmcBadgeRequest) => Promise<TmcBadgeCatalog> };
   readonly settings: {
+    readonly setChatAppearance: (value: TmcChatAppearance) => Promise<TmcDesktopSettings>;
     readonly get: () => Promise<TmcDesktopSettings>;
     readonly setCurrentChannel: (
       request: SetCurrentChannelRequest,

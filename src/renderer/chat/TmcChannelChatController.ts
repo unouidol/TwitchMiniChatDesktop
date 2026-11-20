@@ -1,4 +1,13 @@
 import { TMC_ACCOUNT_CHANGED_EVENT } from '../accounts/initializeAccountSwitcher';
+import { createMessageContent } from './createMessageContent';
+import { appendReplyControls } from './createReplyControls';
+import { createChatAuthor } from './createChatAuthor';
+import { TmcChatNameColorController } from './TmcChatNameColorController';
+import { isTwitchLogin } from '../../shared/chat/TmcUserColors';
+import { markChatAttention } from './markChatAttention';
+import { createChatBadges } from './createChatBadges';
+import { TmcChatBadgeController } from './TmcChatBadgeController';
+import { TmcChatSearchController } from './TmcChatSearchController';
 import {
   renderFavoriteChannels,
   renderRecentChannels,
@@ -80,6 +89,9 @@ export class TmcChannelChatController {
   private readonly liveStatusElement: HTMLElement | null;
   private readonly pcgSessionPanel: TmcPcgSessionPanelController | null;
   private readonly scrollController: TmcChatScrollController | null;
+  private readonly nameColorController: TmcChatNameColorController;
+  private readonly badgeController: TmcChatBadgeController;
+  private readonly searchController: TmcChatSearchController;
   private readonly renderedMessageKeys: string[] = [];
   private readonly renderedMessageKeySet = new Set<string>();
   private readonly unsubscribeLiveMessage: () => void;
@@ -89,13 +101,35 @@ export class TmcChannelChatController {
   private liveStatusRevision = 0;
   private activeChannelState: TmcAccountChannelState | null = null;
   private generation = 0;
+  private readonly completionUsers = new Set<string>();
+  private readonly mentionTargets: HTMLElement[] = [];
+  private mentionPosition = -1;
+  private mentionsCapped = false;
+  private readonly mentionButton = document.querySelector<HTMLButtonElement>('[data-tmc-mentions]');
+  private readonly handleNextMention = (): void => {
+    if (!this.mentionTargets.length) return;
+    this.mentionPosition = (this.mentionPosition + 1) % this.mentionTargets.length;
+    this.scrollController?.revealMessage(this.mentionTargets[this.mentionPosition]);
+  };
 
   private readonly handleAuthLoggedIn = (): void => {
+    this.generation++;
+    this.resetMentions();
+    this.completionUsers.clear();
+    this.nameColorController.reset();
+    this.badgeController.reset();
+    this.searchController.reset();
     this.scrollController?.resetForContextChange();
     void this.reconnectCurrentChannelAfterAccountChange();
   };
 
   private readonly handleAccountChanged = (): void => {
+    this.generation++;
+    this.resetMentions();
+    this.completionUsers.clear();
+    this.nameColorController.reset();
+    this.badgeController.reset();
+    this.searchController.reset();
     this.scrollController?.resetForContextChange();
     void this.reconnectCurrentChannelAfterAccountChange();
   };
@@ -105,7 +139,11 @@ export class TmcChannelChatController {
    */
   constructor(options: TmcChannelChatControllerOptions) {
     this.tmc = options.tmc;
+    this.nameColorController = new TmcChatNameColorController(this.tmc, () => this.currentChannel);
+    this.badgeController = new TmcChatBadgeController(this.tmc, () => this.currentChannel, () => this.notifyViewportChanged());
     this.channelInput = options.channelInput;
+    this.mentionButton?.addEventListener('click', this.handleNextMention);
+    this.renderMentionCount();
     this.loadHistoryButton = options.loadHistoryButton || null;
     this.pcgSessionPanel = options.pcgSessionPanel || null;
     this.liveStatusElement = document.querySelector<HTMLElement>(
@@ -120,6 +158,7 @@ export class TmcChannelChatController {
     this.scrollController = chatList && jumpToLatestButton
       ? new TmcChatScrollController(chatList, jumpToLatestButton)
       : null;
+    this.searchController = new TmcChatSearchController((row) => this.scrollController?.revealMessage(row), () => this.notifyViewportChanged());
 
     let channelControls: ChannelSidebarControls = {
       favoriteToggleButton: null,
@@ -171,7 +210,7 @@ export class TmcChannelChatController {
   }
 
   /**
-   * Reloads history and live chat for the current channel input value.
+   * Reloads the opened channel; unsubmitted navigation text is not a selection.
    */
   async refreshCurrentChannel(): Promise<void> {
     const channel = this.readCurrentChannel();
@@ -181,6 +220,24 @@ export class TmcChannelChatController {
     }
 
     await this.loadChannel(channel);
+  }
+
+  getCurrentChannel(): string | null {
+    return this.currentChannel;
+  }
+
+  getCompletionUsers(): readonly string[] { return [...this.completionUsers]; }
+
+  private rememberCompletionUser(username: string): void {
+    const login = username.trim().toLowerCase();
+    if (!isTwitchLogin(login)) return;
+    this.completionUsers.delete(login);
+    this.completionUsers.add(login);
+    while (this.completionUsers.size > 1000) this.completionUsers.delete(this.completionUsers.values().next().value);
+  }
+
+  notifyViewportChanged(): void {
+    this.scrollController?.notifyViewportChanged();
   }
 
   /**
@@ -200,6 +257,12 @@ export class TmcChannelChatController {
    * Removes live chat and auth event listeners owned by this controller.
    */
   dispose(): void {
+    this.mentionButton?.removeEventListener('click', this.handleNextMention);
+    this.mentionTargets.length = 0;
+    this.completionUsers.clear();
+    this.nameColorController.dispose();
+    this.badgeController.dispose();
+    this.searchController.dispose();
     this.unsubscribeLiveMessage();
     this.unsubscribeStatusChanged();
     this.scrollController?.destroy();
@@ -218,6 +281,14 @@ export class TmcChannelChatController {
     const generation = ++this.generation;
 
     this.currentChannel = normalizedChannel;
+    this.resetMentions();
+    this.completionUsers.clear();
+    this.nameColorController.reset();
+    this.badgeController.reset();
+    this.searchController.reset();
+    dispatchChannelChanged(normalizedChannel);
+    const channelLabel = document.querySelector<HTMLElement>('#chatChannelLabel');
+    if (channelLabel) channelLabel.textContent = `#${normalizedChannel}`;
     this.setChannelInput(normalizedChannel);
     this.updateFavoriteToggleButton();
     console.debug('[TMC Channel] switching', {
@@ -230,7 +301,8 @@ export class TmcChannelChatController {
     this.setRefreshDisabled(true);
     this.scrollController?.resetForContextChange();
     clearChatList();
-    dispatchChannelChanged(normalizedChannel);
+    this.renderedMessageKeys.length = 0;
+    this.renderedMessageKeySet.clear();
     this.appendLocalMessage('system', `Loading history for #${normalizedChannel}...`);
 
     try {
@@ -259,7 +331,17 @@ export class TmcChannelChatController {
         return;
       }
 
-      renderHistoryMessages(result.messages, this.scrollController);
+      // Live rows may arrive while history is pending. The replacement must
+      // invalidate their search entries before detaching the actual DOM rows.
+      this.searchController.reset();
+      const authors = renderHistoryMessages(result.messages, this.scrollController);
+      for (const author of authors) this.rememberMention(author);
+      for (const message of result.messages) this.rememberCompletionUser(message.user);
+      this.nameColorController.schedule(authors);
+      this.badgeController.schedule(authors);
+      authors.forEach((author, index) => {
+        if (author.parentElement) this.searchController.add(author.parentElement, result.messages[index].user, result.messages[index].text);
+      });
       this.rememberHistoryMessages(result.messages);
       this.appendLocalMessage(
         'system',
@@ -471,7 +553,47 @@ export class TmcChannelChatController {
       return;
     }
 
-    appendLiveChatMessage(message, this.scrollController);
+    const author = appendLiveChatMessage(message, this.scrollController);
+    this.rememberCompletionUser(message.username);
+    if (author) this.nameColorController.schedule([author]);
+    if (author) this.badgeController.schedule([author]);
+    if (author?.parentElement) this.searchController.add(author.parentElement, message.username, message.text);
+    if (author) this.rememberMention(author);
+  }
+
+  private rememberMention(author: HTMLElement): void {
+    const row = author.closest<HTMLElement>('[data-tmc-mention-kind]');
+    const profileId = document.querySelector<HTMLSelectElement>('[data-tmc-account-select]')?.value;
+    if (!row || row.dataset.tmcAttentionProfile !== profileId) return;
+    this.mentionTargets.push(row);
+    if (this.mentionTargets.length > 1000) {
+      this.mentionTargets.shift();
+      this.mentionPosition = Math.max(-1, this.mentionPosition - 1);
+      this.mentionsCapped = true;
+    }
+    this.renderMentionCount();
+  }
+
+  private resetMentions(): void {
+    this.mentionTargets.length = 0;
+    this.mentionPosition = -1;
+    this.mentionsCapped = false;
+    for (const row of document.querySelectorAll<HTMLElement>('#chatList [data-tmc-mention-kind]')) {
+      row.classList.remove('tmc-message-mention');
+      delete row.dataset.tmcMentionKind;
+      delete row.dataset.tmcAttentionProfile;
+      row.querySelector('[data-tmc-mention-label]')?.remove();
+    }
+    this.renderMentionCount();
+  }
+
+  private renderMentionCount(): void {
+    if (!this.mentionButton) return;
+    const count = this.mentionTargets.length;
+    this.mentionButton.disabled = count === 0;
+    this.mentionButton.textContent = `Mentions (${count}${this.mentionsCapped ? '+' : ''})`;
+    this.mentionButton.title = this.mentionsCapped ? 'Next mention · most recent 1000 in loaded chat' : 'Next mention in loaded chat (includes history)';
+    this.mentionButton.setAttribute('aria-label', `Next mention · ${count}${this.mentionsCapped ? '+' : ''} in loaded chat`);
   }
 
   private handleStatusChanged(status: TmcChatLiveStatus): void {
@@ -575,9 +697,7 @@ export class TmcChannelChatController {
   }
 
   private readCurrentChannel(): string | null {
-    const channel = normalizeChannel(this.channelInput?.value || this.currentChannel || '');
-
-    return channel || null;
+    return this.currentChannel;
   }
 
   private setChannelInput(channel: string): void {
@@ -606,6 +726,8 @@ export class TmcChannelChatController {
     if (this.loadHistoryButton) {
       this.loadHistoryButton.disabled = disabled;
     }
+    const openButton = document.querySelector<HTMLButtonElement>('#openChannelButton');
+    if (openButton) openButton.disabled = disabled;
   }
 
   private isCurrentGeneration(generation: number): boolean {
@@ -623,11 +745,11 @@ export function notifyAuthLoggedIn(): void {
 function appendLiveChatMessage(
   message: TmcLiveChatMessage,
   scrollController: TmcChatScrollController | null,
-): void {
+): HTMLElement | null {
   const chatList = document.querySelector<HTMLDivElement>('#chatList');
 
   if (!chatList) {
-    return;
+    return null;
   }
 
   const messageElement = document.createElement('article');
@@ -644,15 +766,16 @@ function appendLiveChatMessage(
   timeElement.dateTime = new Date(message.timestampMs).toISOString();
   timeElement.textContent = formatTime(message.timestampMs);
 
-  const authorElement = document.createElement('strong');
-  authorElement.textContent = message.displayName || message.username;
+  const authorElement = createChatAuthor(message.username, message.displayName || message.username, message.color);
 
-  const textElement = document.createElement('span');
-  textElement.textContent = message.text;
+  const textElement = createMessageContent(message.text, message.fragments);
 
-  messageElement.append(timeElement, authorElement, textElement);
+  messageElement.append(timeElement, createChatBadges(message.badges), authorElement, textElement);
+  appendReplyControls(messageElement, message, message.displayName || message.username, message.reply);
+  markChatAttention(messageElement, message.attention);
   chatList.appendChild(messageElement);
   scrollController?.notifyMessagesAppended();
+  return authorElement;
 }
 
 function ensureChannelSidebarControls(): ChannelSidebarControls {

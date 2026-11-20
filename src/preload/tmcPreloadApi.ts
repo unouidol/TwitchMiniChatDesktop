@@ -11,6 +11,9 @@ import type {
   TmcSetActiveAccountRequest,
 } from '../shared/accounts/TmcAccountModels';
 import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
+import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
+import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
+import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
 import type {
   FinalizeTwitchLoginRequest,
   FinalizeTwitchLoginResult,
@@ -47,6 +50,7 @@ import type {
 import type {
   SetCurrentChannelRequest,
   TmcDesktopSettings,
+  TmcChatAppearance,
 } from '../shared/settings/TmcSettingsModels';
 
 /**
@@ -168,6 +172,8 @@ export type TmcBackendPreloadApi = {
  * Live chat API exposed to the local renderer through the safe preload bridge.
  */
 export type TmcChatPreloadApi = {
+  readonly openLink: (request: { readonly url: string }) => Promise<void>;
+  readonly getUserColors: (request: TmcUserColorsRequest) => Promise<TmcUserColorsResult>;
   /**
    * Connects the active account to Twitch live chat for the selected channel.
    */
@@ -213,6 +219,7 @@ export type TmcChatPreloadApi = {
  * Settings API exposed to the local renderer through the safe preload bridge.
  */
 export type TmcSettingsPreloadApi = {
+  readonly setChatAppearance: (value: TmcChatAppearance) => Promise<TmcDesktopSettings>;
   /**
    * Loads non-secret local desktop settings.
    */
@@ -297,6 +304,7 @@ export type TmcPcgPreloadApi = {
  * file system APIs, or unrestricted Inter-Process Communication.
  */
 export type TmcPreloadApi = {
+  readonly emotes: { readonly getCatalog: (request: TmcEmoteCatalogRequest) => Promise<TmcEmoteCatalog> };
   /**
    * Returns basic application information for the local UI.
    */
@@ -336,6 +344,7 @@ export type TmcPreloadApi = {
    * Settings operations available to the local UI.
    */
   readonly settings: TmcSettingsPreloadApi;
+  readonly badges: { readonly getCatalog: (request: TmcBadgeRequest) => Promise<TmcBadgeCatalog> };
 
   /**
    * Passive PCG operations available to the local UI.
@@ -550,12 +559,15 @@ const IPC_PCG_HOLD_ACTIVE_SESSION = resolveIpcChannel(
 function createTmcPreloadApi(): TmcPreloadApi {
   return {
     getAppInfo: (): TmcAppInfo => ({
-      appName: 'Twitch Mini Chat Desktop',
+      appName: 'TMC desktop',
       platform: process.platform,
     }),
 
     ping: async (): Promise<string> => {
       return ipcRenderer.invoke(IPC_APP_PING);
+    },
+    emotes: {
+      getCatalog: (request: TmcEmoteCatalogRequest): Promise<TmcEmoteCatalog> => ipcRenderer.invoke(TMC_IPC_CHANNELS.EMOTE_CATALOG, request),
     },
 
     accounts: {
@@ -647,6 +659,8 @@ function createTmcPreloadApi(): TmcPreloadApi {
     },
 
     chat: {
+      openLink: (request: { readonly url: string }): Promise<void> => ipcRenderer.invoke(TMC_IPC_CHANNELS.CHAT_OPEN_LINK, request),
+      getUserColors: (request: TmcUserColorsRequest): Promise<TmcUserColorsResult> => ipcRenderer.invoke(TMC_IPC_CHANNELS.CHAT_USER_COLORS, request),
       connectLive: async (
         request: TmcConnectLiveChatRequest,
       ): Promise<TmcChatLiveStatus> => {
@@ -689,6 +703,8 @@ function createTmcPreloadApi(): TmcPreloadApi {
     },
 
     settings: {
+      setChatAppearance: (value: TmcChatAppearance): Promise<TmcDesktopSettings> =>
+        ipcRenderer.invoke(TMC_IPC_CHANNELS.SETTINGS_SET_CHAT_APPEARANCE, value),
       get: async (): Promise<TmcDesktopSettings> => {
         return ipcRenderer.invoke(IPC_SETTINGS_GET);
       },
@@ -699,6 +715,8 @@ function createTmcPreloadApi(): TmcPreloadApi {
         return ipcRenderer.invoke(IPC_SETTINGS_SET_CURRENT_CHANNEL, request);
       },
     },
+
+    badges: { getCatalog: (request: TmcBadgeRequest): Promise<TmcBadgeCatalog> => ipcRenderer.invoke(TMC_IPC_CHANNELS.CHAT_BADGES, request) },
 
     pcg: {
       activate: async (

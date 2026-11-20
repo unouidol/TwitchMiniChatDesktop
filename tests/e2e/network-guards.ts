@@ -30,10 +30,20 @@ export function installNetworkGuards(options: {
     collectionComplete: false,
     completionReason: 'collecting',
   };
+  let progressSequence = 0;
+  let finalWritten = false;
   function persist() {
-    const temporary = `${options.evidencePath}.tmp`;
+    if (finalWritten) return;
+    // Never replace a file that a Windows scanner/reader may still hold open.
+    // Sparse immutable progress snapshots retain crash diagnostics; the complete
+    // report keeps its existing name and is published exactly once at finish.
+    const sequence = ++progressSequence;
+    if (!evidence.collectionComplete && (sequence & (sequence - 1)) !== 0) return;
+    const destination = evidence.collectionComplete ? options.evidencePath : `${options.evidencePath}.progress-${sequence}`;
+    const temporary = `${destination}.tmp`;
     fs.writeFileSync(temporary, JSON.stringify(evidence, null, 2));
-    fs.renameSync(temporary, options.evidencePath);
+    fs.renameSync(temporary, destination);
+    if (evidence.collectionComplete) finalWritten = true;
   }
   function finish(reason: string) {
     if (evidence.collectionComplete) return;
