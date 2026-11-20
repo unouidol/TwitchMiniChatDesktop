@@ -13,6 +13,13 @@ export const TMC_IPC_CHANNELS = {
   CHAT_USER_COLORS: 'tmc:chat:user-colors',
   CHAT_OPEN_LINK: 'tmc:chat:open-link',
   CHAT_BADGES: 'tmc:chat:badges',
+  PLAYER_OPEN: 'tmc:player:open',
+  PLAYER_STATUS: 'tmc:player:status',
+  PLAYER_CHANGED: 'tmc:player:changed',
+  PLAYER_LAYOUT: 'tmc:player:layout',
+  PLAYER_MODE: 'tmc:player:mode',
+  PLAYER_CLOSE: 'tmc:player:close',
+  PLAYER_OCCLUDE: 'tmc:player:occlude',
   SETTINGS_SET_CHAT_APPEARANCE: 'tmc:settings:set-chat-appearance',
 
   /**

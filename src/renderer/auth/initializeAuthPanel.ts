@@ -93,7 +93,7 @@ export async function initializeAuthPanel(): Promise<void> {
     openError.hidden = true;
     try {
       // Native PCG surfaces paint above DOM dialogs; hide without unloading them.
-      await window.tmc.pcg.hideView();
+      await Promise.all([window.tmc.pcg.hideView(), window.tmc.player.occlude({ hidden: true })]);
       if (disposed || current !== flow) return;
       dialog.showModal();
       delete dialog.dataset.opening;

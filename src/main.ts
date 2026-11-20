@@ -3,6 +3,7 @@ import started from 'electron-squirrel-startup';
 import { createMainWindow } from './main/windows/createMainWindow';
 import { registerIpcHandlers } from './main/ipc/registerIpcHandlers';
 import { TMC_RUNTIME_CONFIG } from './main/config/TmcRuntimeConfig';
+import { registerPlayerShutdown } from './main/player/registerPlayerShutdown';
 
 /*
  * Handles creating/removing shortcuts on Windows when installing/uninstalling.
@@ -17,7 +18,8 @@ if (started) {
  * IPC handlers must be registered before the renderer window is created.
  */
 app.whenReady().then(async () => {
-  await registerIpcHandlers(TMC_RUNTIME_CONFIG);
+  const services = await registerIpcHandlers(TMC_RUNTIME_CONFIG);
+  registerPlayerShutdown(services.player);
   createMainWindow();
 });
 
