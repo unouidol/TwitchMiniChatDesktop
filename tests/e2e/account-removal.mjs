@@ -40,6 +40,7 @@ const inheritedRunAsNode = process.env.ELECTRON_RUN_AS_NODE;
 delete process.env.ELECTRON_RUN_AS_NODE;
 let scenarioError;
 let result;
+let windowSizeSequence = 0;
 
 async function waitFor(predicate, message, timeout = 20000) {
   const deadline = Date.now() + timeout;
@@ -78,6 +79,20 @@ async function readNativeViews() {
   const snapshots = (await fs.readdir(root)).filter((name) => /^first-pcg-bounds-\d+\.json$/.test(name));
   snapshots.sort((a, b) => Number(a.match(/(\d+)\.json$/)[1]) - Number(b.match(/(\d+)\.json$/)[1]));
   return snapshots.length ? JSON.parse(await fs.readFile(path.join(root, snapshots.at(-1)), 'utf8')) : [];
+}
+
+// ChromeDriver's Browser.getWindowForTarget is unavailable for this Electron
+// build. Control only this run's actual BrowserWindow through its marked root.
+async function resizeOwnedWindow(width, height) {
+  const sequence = ++windowSizeSequence;
+  const command = path.join(root, `first-window-size-${sequence}.json`);
+  await fs.writeFile(command, JSON.stringify({ width, height }), { flag: 'wx' });
+  const acknowledgement = path.join(root, `first-window-size-${sequence}.ack.json`);
+  await waitFor(async () => {
+    try { await fs.access(acknowledgement); return true; }
+    catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+  }, 'owned native window resize');
+  return JSON.parse(await fs.readFile(acknowledgement, 'utf8'));
 }
 
 async function readNetworkEvidence(phase) {
@@ -222,7 +237,7 @@ try {
   await exerciseEmotes(browser, fixture, evidence, readNativeViews, async () => {
     try { return JSON.parse(await fs.readFile(path.join(root, 'chat-link-attempts.json'), 'utf8')).attempts; }
     catch (error) { if (error.code !== 'ENOENT') throw error; return []; }
-  });
+  }, resizeOwnedWindow);
   await exerciseAppearance(browser, fixture, evidence, readNativeViews);
   await exerciseTimestamps(browser, fixture, readNativeViews);
   await exerciseReplies(browser, fixture, evidence);

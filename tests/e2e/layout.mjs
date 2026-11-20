@@ -62,5 +62,8 @@ export async function exerciseLayout(browser, fixture, evidence, readNativeViews
   assert.equal(await label.getText(), '#fixture-channel');
   const headerHeight = await browser.execute("return document.querySelector('.tmc-header').getBoundingClientRect().height");
   assert.ok(headerHeight <= 80, 'Header must stay compact');
+  const viewport = await browser.execute('return { scrollWidth: document.documentElement.scrollWidth, width: innerWidth, scrollTop: document.scrollingElement.scrollTop }');
+  assert.ok(viewport.scrollWidth <= viewport.width, 'The shell fits narrow Windows desktops without horizontal document scrolling');
+  assert.equal(viewport.scrollTop, 0, 'Panels scroll independently; the document stays fixed for native view alignment');
   await browser.saveScreenshot(path.join(evidence, 'layout.png'));
 }

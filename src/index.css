@@ -11,8 +11,9 @@
 
 body {
   margin: 0;
-  min-width: 1040px;
-  min-height: 650px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(145, 70, 255, 0.16), transparent 34rem),
     #030712;
@@ -700,10 +701,6 @@ button:focus-visible, summary:focus-visible, select:focus-visible {
 /* Responsive-ish desktop fallback */
 
 @media (max-width: 1180px) {
-  body {
-    min-width: 1040px;
-  }
-
   .tmc-layout {
     grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(330px, 344px);
   }

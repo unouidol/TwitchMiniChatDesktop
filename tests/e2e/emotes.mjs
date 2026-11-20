@@ -5,7 +5,7 @@ import { exerciseLinks } from './links.mjs';
 import { exerciseCompletion } from './completion.mjs';
 import { exerciseSearchWithEmotes } from './search.mjs';
 
-export async function exerciseEmotes(browser, fixture, evidence, readNativeViews, readLinkAttempts) {
+export async function exerciseEmotes(browser, fixture, evidence, readNativeViews, readLinkAttempts, resizeOwnedWindow) {
   // Substitute only image delivery/decoding input. No real CDN requests, relaxed
   // network guards, production renderer test API, or substituted parsing/DOM.
   const syntheticImage = 'data:image/svg+xml,' + encodeURIComponent(
@@ -70,7 +70,7 @@ export async function exerciseEmotes(browser, fixture, evidence, readNativeViews
     return Array.from(body.childNodes, (node) => node instanceof HTMLImageElement ? node.alt : node.textContent).join('');
   `), 'Kappa waves');
   await browser.saveScreenshot(path.join(evidence, 'emotes.png'));
-  await exerciseEmotePicker(browser, fixture, evidence, readNativeViews);
+  await exerciseEmotePicker(browser, fixture, evidence, readNativeViews, resizeOwnedWindow);
   await exerciseLinks(browser, fixture, evidence, readLinkAttempts);
   await exerciseCompletion(browser, fixture, evidence, readNativeViews);
   await exerciseSearchWithEmotes(browser, fixture, evidence, readNativeViews);

@@ -158,9 +158,21 @@ void app.whenReady().then(async () => {
   // Read-only native-view observation. No renderer test API or IPC substitute.
   let previousBounds = '';
   let boundsRevision = 0;
+  let sizeCommand = 0;
   let cookieCommand = '';
   let cookieCommandPending = false;
   const boundsObservation = setInterval(() => {
+    const sizePath = path.join(root, `${phase}-window-size-${sizeCommand + 1}.json`);
+    if (fs.existsSync(sizePath)) {
+      const requested: unknown = JSON.parse(fs.readFileSync(sizePath, 'utf8'));
+      assert.ok(requested && typeof requested === 'object' && 'width' in requested && 'height' in requested);
+      const { width, height } = requested;
+      assert.ok(typeof width === 'number' && Number.isInteger(width) && width >= 960 && width <= 2000);
+      assert.ok(typeof height === 'number' && Number.isInteger(height) && height >= 650 && height <= 1400);
+      const previous = window.getBounds();
+      window.setSize(width, height);
+      fs.writeFileSync(path.join(root, `${phase}-window-size-${++sizeCommand}.ack.json`), JSON.stringify(previous));
+    }
     if (window.isDestroyed()) return;
     // Parent-runner control of synthetic cookie storage, never production IPC.
     const commandPath = path.join(root, 'pcg-cookie-command');

@@ -22,8 +22,8 @@ export function createMainWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1160,
     height: 720,
-    minWidth: 1040,
-    minHeight: 560,
+    minWidth: 960,
+    minHeight: 650,
     title: 'TMC desktop',
     backgroundColor: '#111827',
     webPreferences: {

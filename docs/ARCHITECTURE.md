@@ -5,6 +5,12 @@ It is an orientation aid; inspect code and callers before changing behavior.
 
 ## Current boundaries
 
+The shell follows the actual client viewport inside a 960x650 outer-window
+minimum, accounting for Windows frame borders; the document itself does not
+scroll. Sidebar, message feed and catalogs own their scrolling. This
+keeps DOM host positions aligned with native PCG bounds when Windows constrains
+the application to a narrow display or focus changes inside the chat controls.
+
 Local chat search is owned by TmcChatSearchController through the existing
 channel controller. Search opens an integrated panel with a button or Ctrl/Cmd+F,
 matches literal NFC/case-normalized message text (including original emote codes)

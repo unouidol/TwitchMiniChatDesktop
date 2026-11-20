@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
-export async function exerciseEmotePicker(browser, fixture, evidence, readNativeViews) {
+export async function exerciseEmotePicker(browser, fixture, evidence, readNativeViews, resizeOwnedWindow) {
   const trigger = await browser.$('[data-tmc-emote-open]');
   const panel = await browser.$('[data-tmc-emote-picker]');
   const input = await browser.$('#messageInput');
@@ -32,6 +32,20 @@ export async function exerciseEmotePicker(browser, fixture, evidence, readNative
   assert.ok(geometry.composerBottom <= geometry.viewportHeight + 1, 'Composer and Send stay on screen');
   assert.ok(geometry.feedHeight >= 180, 'Messages remain readable while picker is open');
   assert.ok(geometry.panelHeight <= geometry.chatHeight * 0.4 + 1);
+  const originalSize = await resizeOwnedWindow(960, 650);
+  try {
+    await browser.waitUntil(async () => (await browser.execute('return innerWidth')) <= 960);
+    const minimum = await browser.execute(`return {
+      width: innerWidth, scrollWidth: document.documentElement.scrollWidth,
+      right: document.querySelector('.tmc-pcg-panel').getBoundingClientRect().right,
+      composerBottom: document.querySelector('#composerForm').getBoundingClientRect().bottom,
+      height: innerHeight, feedHeight: document.querySelector('.tmc-chat-feed').getBoundingClientRect().height,
+      pickerHeight: document.querySelector('[data-tmc-emote-picker]').getBoundingClientRect().height
+    }`);
+    assert.ok(minimum.scrollWidth <= minimum.width && minimum.right <= minimum.width + 1, 'The true minimum client viewport fits the complete shell and native host');
+    assert.ok(minimum.composerBottom <= minimum.height + 1 && minimum.feedHeight >= 180 && minimum.pickerHeight >= 100,
+      'Messages, picker controls and Send remain usable at the true outer-window minimum');
+  } finally { await resizeOwnedWindow(originalSize.width, originalSize.height); }
   fixture.releaseEmoteCatalog();
   await browser.waitUntil(async () => (await browser.$$('[data-tmc-emote-section]')).length === 4);
   assert.deepEqual(await browser.execute("return Array.from(document.querySelectorAll('[data-tmc-emote-section]'), (section) => section.dataset.tmcEmoteSection)"), ['favorites', 'channel', 'personal', 'global']);
