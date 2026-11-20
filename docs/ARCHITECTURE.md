@@ -36,7 +36,12 @@ recorded even before view creation: login opening awaits video/PCG hiding, and
 account menus hide/mute the embedded player throughout loading. Restoring the
 same view preserves its prior native audio mute state. The detached player is a
 separate surface. Renderer observers, frames and subscriptions are disposed on
-pagehide; main owns source/session cleanup on close and application shutdown.
+pagehide; main owns source/session cleanup on close, owner-document navigation
+(including reload) and application shutdown. A fresh renderer synchronizes modal
+occlusion from its own DOM, without relying on exit-time IPC from the old frame.
+The single window-owned navigation watcher is installed before queuing an open
+and stays through resource cleanup, invalidating pending requests on reload;
+it is removed when that window closes or ownership changes.
 The quit coordinator waits for serialized cleanup before Electron tears down
 sessions, with a ten-second failure deadline and an explicit non-success exit
 path. Closing the application while video is active is covered separately from

@@ -80,6 +80,44 @@ test('latest pending context can be cancelled before creation and stale close ca
   assert.deepEqual([...partitions], ['tmc-anonymous-live-player']);
 });
 
+test('owner document reload closes media; its window-owned watcher ignores frame and same-document navigation', async (context) => {
+  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+  const owner = new Window(); await manager.show(request(a), owner);
+  const view = views.at(-1), source = manager.source;
+  owner.webContents.emit('did-start-navigation', { isMainFrame: false, isSameDocument: false });
+  owner.webContents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: true });
+  assert.equal(view.webContents.isDestroyed(), false);
+  manager.occlude(true, owner);
+  owner.webContents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+  assert.equal(view.webContents.isDestroyed(), true);
+  await manager.close();
+  assert.equal(manager.source, null); assert.equal(owner.webContents.listenerCount('did-start-navigation'), 1);
+  await assert.rejects(fetch(`${source.origin}${source.pathname}?channel=channel`, { signal: AbortSignal.timeout(1000) }), /fetch failed/);
+  manager.occlude(false, owner); await manager.show(request(a), owner);
+  assert.equal(views.at(-1).bounds.width, rectangle.width);
+  owner.destroy(); await manager.close();
+  assert.equal(owner.webContents.listenerCount('did-start-navigation'), 0);
+});
+
+test('reload rejects an open queued behind previous session cleanup before it creates media', async (context) => {
+  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+  const owner = new Window(); await manager.show(request(a), owner);
+  let release, entered;
+  const blocked = new Promise((resolve) => { entered = resolve; });
+  context.mock.method(storage, 'clearStorageData', async () => {
+    entered(); await new Promise((resolve) => { release = resolve; });
+  });
+  const closing = manager.close(); await blocked;
+  const count = views.length;
+  const opening = manager.show(request(a), owner);
+  const rejected = assert.rejects(opening, /superseded/);
+  owner.webContents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+  context.mock.restoreAll(); release();
+  await closing; await rejected; await manager.close();
+  assert.equal(views.length, count); assert.equal(manager.source, null); assert.equal(manager.getStatus().state, 'closed');
+  owner.destroy();
+});
+
 test('teardown uses its captured WebContents even when native view destruction removes the getter', async (context) => {
   const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
   const owner = new Window(); await manager.show(request(a), owner);

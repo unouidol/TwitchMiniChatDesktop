@@ -155,11 +155,9 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
   const observe = (): void => { observer.observe(chat); for (const child of chat.children) if (!child.classList.contains('tmc-chat-feed')) observer.observe(child); };
   observe();
   const mutations = new MutationObserver(() => { observe(); schedule(); }); mutations.observe(chat, { childList: true });
-  const unsubscribe = tmc.player.onStatusChanged(render); schedule();
+  const unsubscribe = tmc.player.onStatusChanged(render); occlusionChanged(); schedule();
   return { dispose: () => {
     lifetime.abort(); ++revision; observer.disconnect(); mutations.disconnect(); unsubscribe();
     if (frame !== null) cancelAnimationFrame(frame);
-    const target = context;
-    if (target) void tmc.player.close(target).catch(() => console.warn('[TMC Player] Playback cleanup failed during page exit.'));
   } };
 }

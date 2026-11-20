@@ -21,7 +21,8 @@ IDs/bounds/destruction and a one-time capability observation of the app-owned
 local wrapper (never remote Twitch or PCG DOM). Tests keep provider playback
 substitution distinct from real-video evidence, and check held loading/modal
 occlusion, resizing, channel drafts/history refresh, reparenting, account changes,
-window-close cleanup, independent PCG and no chat sends. App shutdown with video
+window-close cleanup, owner reload while login is open, independent PCG and no
+chat sends. App shutdown with video
 still active is exercised; source/view cleanup observations are retained without
 credentials or provider DOM. Native window resizing/closing
 uses bounded commands in the test-owned root because this Electron build lacks

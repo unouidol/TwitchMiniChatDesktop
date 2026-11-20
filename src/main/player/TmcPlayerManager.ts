@@ -12,6 +12,8 @@ export class TmcPlayerManager {
   private contents: WebContents | null = null;
   private document: TmcPlayerDocument | null = null;
   private owner: BrowserWindow | null = null;
+  private watchedOwner: BrowserWindow | null = null;
+  private ownerContents: WebContents | null = null;
   private viewOwner: BrowserWindow | null = null;
   private detached: BrowserWindow | null = null;
   private bounds: TmcPlayerBounds | null = null;
@@ -20,6 +22,10 @@ export class TmcPlayerManager {
   private mutedBeforeOcclusion = false;
   private readonly hiddenOwners = new WeakSet<BrowserWindow>();
   private readonly ownerClosed = (): void => { void this.close().catch(() => console.warn('[TMC Player] Playback cleanup failed.')); };
+  private readonly ownerNavigated = (details: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>): void => {
+    if (details.isMainFrame && !details.isSameDocument) this.ownerClosed();
+  };
+  private readonly ownerDestroyed = (): void => { this.unwatchOwner(); this.ownerClosed(); };
 
   constructor(private readonly activeProfile: () => string | null, private readonly changed: (status: TmcPlayerStatus) => void) {}
   getStatus(): TmcPlayerStatus { return this.status; }
@@ -30,6 +36,7 @@ export class TmcPlayerManager {
   }
 
   show(request: TmcPlayerOpenRequest, owner: BrowserWindow): Promise<TmcPlayerStatus> {
+    this.watchOwner(owner);
     const context = { profileId: request.profileId, channel: request.channel };
     this.requestedContext = context;
     const revision = ++this.revision;
@@ -39,7 +46,7 @@ export class TmcPlayerManager {
       try {
         if (this.status.profileId !== context.profileId || this.owner !== owner) await this.release();
         this.assertCurrent(context, revision);
-        if (!this.owner) { this.owner = owner; owner.once('closed', this.ownerClosed); }
+        if (!this.owner) this.owner = owner;
         const channelChanged = !this.view || this.status.channel !== context.channel;
         this.bounds = request.bounds;
         this.update({ ...context, mode: request.mode, state: 'loading', message: null });
@@ -123,6 +130,18 @@ export class TmcPlayerManager {
     this.pending = result.then(() => undefined, () => undefined);
     return result;
   }
+  private watchOwner(owner: BrowserWindow): void {
+    if (this.watchedOwner === owner) return;
+    this.unwatchOwner();
+    this.watchedOwner = owner; this.ownerContents = owner.webContents;
+    owner.once('closed', this.ownerDestroyed);
+    this.ownerContents.on('did-start-navigation', this.ownerNavigated);
+  }
+  private unwatchOwner(): void {
+    this.watchedOwner?.removeListener('closed', this.ownerDestroyed);
+    this.ownerContents?.removeListener('did-start-navigation', this.ownerNavigated);
+    this.watchedOwner = null; this.ownerContents = null;
+  }
   private assertCurrent(context: TmcPlayerContext, revision: number): void {
     if (revision !== this.revision || this.activeProfile() !== context.profileId) throw new Error('Player request superseded.');
   }
@@ -189,7 +208,6 @@ export class TmcPlayerManager {
     detached.destroy();
   }
   private async release(): Promise<void> {
-    this.owner?.removeListener('closed', this.ownerClosed);
     if (this.view) {
       if (this.viewOwner && !this.viewOwner.isDestroyed()) this.viewOwner.contentView.removeChildView(this.view);
       const contents = this.contents;
