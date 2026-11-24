@@ -123,7 +123,7 @@ snapshots avoid Windows errors replacing files held by scanners/readers. Failure
 cleanup retains the latest partial snapshot under a distinct progress name;
 partial reports never satisfy completed-network-evidence acceptance checks.
 
-Use Node **24.18.0** with its bundled npm **11.16.0**, matching the CI runtime.
+Use Node **24.22.3** with its bundled npm **11.19.1**, matching the CI runtime.
 In a fresh Windows checkout, run:
 
 ```text
@@ -133,6 +133,10 @@ npm run typecheck
 npm run lint
 git diff --check
 ```
+
+The [November dependency review](docs/security/dependency-review-2026-11.md) records
+the security changes and unresolved tooling findings. `npm ci` invokes the pinned
+Electron vendor installer through the project postinstall.
 
 Dependency installation accesses package/download services. The checks require
 no Twitch account, backend credentials, repository secrets, or `local.properties`.
@@ -186,7 +190,7 @@ preserve user/development links and avoid starting authenticated services.
 
 [The quality workflow](.github/workflows/quality.yml) runs on pull requests,
 pushes to the verified default branch `main`, and manual dispatch. The existing
-`Windows quality checks` job uses `windows-2025`, Node 24.18.0, `npm ci`, and
+`Windows quality checks` job uses `windows-2025`, Node 24.22.3, `npm ci`, and
 separate test/typecheck/lint steps. A failing check fails the job; later steps
 may be skipped. Runs time out after 20 minutes and superseded runs for the same
 pull request or branch are cancelled.
@@ -382,7 +386,7 @@ including direct native-menu bounds/identity observations. Its manual layout
 check and hosted CI remain pending. Earlier broader account tests concern the
 previous interface.
 
-On Windows x64 with Node 24.18.0 and PowerShell 7, install dependencies with
+On Windows x64 with Node 24.22.3 and PowerShell 7, install dependencies with
 `npm ci`, provision the driver as described below, then run `npm run test:e2e`.
 Run serially; generated bundles and sanitized evidence live
 under ignored `.test-build/electron-e2e/`. This command is intentionally separate
@@ -405,9 +409,9 @@ configuration before isolation; the separate entry avoids importing that module
 entirely. Production `src/main.ts`, window preferences, Forge config, and fuses
 are unchanged. This does not establish packaged-app behavior or full startup parity.
 
-Dependencies: `webdriverio` 9.31.9 (WebDriver client/driver lifecycle, Node
->=18.20.0) and `ws` 8.23.0 (loopback IRC fixture). Electron remains 43.0.0;
-ChromeDriver 150.0.7871.46 matches the actual Electron Chromium version.
+Dependencies: `webdriverio` 10.2.0 (WebDriver client/driver lifecycle, Node
+24.22.1 or later within 24.x) and `ws` 8.23.0 (loopback IRC fixture). Electron is
+43.8.12; ChromeDriver 150.0.7871.250 matches its actual Chromium version.
 No scaffolding wizard or new unit runner is needed. Dependency/runtime setup may
 download Electron from official distribution services; WDIO automatic acquisition
 is bypassed by the explicit binaries.
@@ -426,7 +430,7 @@ npm run test:e2e
 ```
 
 The setup utility downloads only the Windows x64 ChromeDriver ZIP from the
-[official Electron 43.0.0 release](https://github.com/electron/electron/releases/tag/v43.0.0).
+[official Electron 43.8.12 release](https://github.com/electron/electron/releases/tag/v43.8.12).
 `tests/e2e/driver-provenance.json` pins its source URL and SHA-256 from the official
 `SHASUMS256.txt`, independently corroborated by the GitHub release asset digest.
 Only after checking the archive does PowerShell 7 `Expand-Archive` extract it.
@@ -448,7 +452,7 @@ the [GitHub environment-file protocol](https://docs.github.com/en/actions/refere
 ### Windows E2E CI job
 
 `Windows Electron account-removal E2E` is a separate `windows-2025` job with a
-25-minute timeout, pinned Node 24.18.0 and bundled npm. It retains inherited
+25-minute timeout, pinned Node 24.22.3 and bundled npm. It retains inherited
 read-only repository permissions, nonpersistent checkout credentials and disabled
 package-manager caching. The original `Windows quality checks` job is unchanged.
 Named steps record versions, run `npm ci`, provision the official checksum-pinned
@@ -475,7 +479,7 @@ local fixtures run; application guards and WDIO parent evidence remain distinct,
 not OS-wide network isolation or dependency remediation.
 
 To reproduce the command sequence locally, use the setup commands above with
-Node 24.18.0/npm 11.16.0 and a fresh test-owned profile (the launcher creates one).
+Node 24.22.3/npm 11.19.1 and a fresh test-owned profile (the launcher creates one).
 For exact workflow replay, give provisioning a disposable `GITHUB_ENV` file, load
 its `TMC_E2E_DRIVER_PATH` assignment into subsequent steps and preserve each native
 exit code when teeing logs. Use an isolated copy for a fresh `npm ci`; never replace

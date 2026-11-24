@@ -1,5 +1,9 @@
 # Architecture map
 
+The current dependency/runtime baseline and remaining development-tool findings
+are recorded in [the November dependency review](security/dependency-review-2026-11.md).
+Forge emits `.vite/build/main.cjs` and `preload.cjs`; both entry paths are explicit.
+
 This document separates the current implementation from desired invariants.
 It is an orientation aid; inspect code and callers before changing behavior.
 
@@ -496,7 +500,7 @@ behavior; the ownership gaps below remain unresolved.
 - `npm test` covers account removal through the actual application composition,
   temporary persistent storage, and service recreation, with controlled external
   substitutes. `.github/workflows/quality.yml` configures Windows quality checks
-  with Node 24.18.0, `npm ci`, and separate test/typecheck/zero-warning lint steps.
+  with Node 24.22.3, `npm ci`, and separate test/typecheck/zero-warning lint steps.
   Baseline hosted execution passed for PR #1 at `ca9c0f2`; that result does not
   cover later changes. The first separate Windows E2E run failed during driver
   negatives because raw short TEMP paths disagreed with canonical cleanup paths;
@@ -518,7 +522,7 @@ Update or remove each entry when the corresponding change is verified.
 
 ## Local verification
 
-Use Node 24.18.0 with its bundled npm 11.16.0. In a fresh Windows checkout:
+Use Node 24.22.3 with its bundled npm 11.19.1. In a fresh Windows checkout:
 
 ```text
 npm ci
@@ -557,7 +561,7 @@ and window settings remain unchanged. See the contributor guide for cleanup,
 diagnostics, tool selection, network guards and coverage limitations.
 
 The separate `Windows Electron account-removal E2E` CI job now configures the same
-synthetic scenario and existing driver/guard/cleanup checks with Node 24.18.0.
+synthetic scenario and existing driver/guard/cleanup checks with Node 24.22.3.
 Provisioning exports only the integrity-verified explicit path through `GITHUB_ENV`;
 the workflow retains scoped diagnostic artifacts, not profiles, stores or binaries.
 Local command reproduction and a configured workflow do not establish a hosted

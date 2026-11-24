@@ -11,9 +11,9 @@ export async function exerciseUserColors(browser, fixture, evidence) {
     await browser.waitUntil(async () => (await author('color-history-red').getAttribute('data-tmc-color-source')) === 'lookup');
   } catch (error) {
     const profileId = await browser.$('[data-tmc-account-select]').getValue();
-    const result = await browser.executeAsync((profile, done) => {
-      globalThis.window.tmc.chat.getUserColors({ profileId: profile, channel: 'fixture-channel', usernames: ['fixture_color_red', 'fixture_color_yellow'] })
-        .then((value) => done(value), () => done({ failed: true }));
+    const result = await browser.execute(async (profile) => {
+      return globalThis.window.tmc.chat.getUserColors({ profileId: profile, channel: 'fixture-channel', usernames: ['fixture_color_red', 'fixture_color_yellow'] })
+        .catch(() => ({ failed: true }));
     }, profileId);
     await fs.writeFile(path.join(evidence, 'user-colors-failure.json'), JSON.stringify({ result, calls: fixture.colorCalls }, null, 2));
     throw error;
@@ -43,9 +43,9 @@ export async function exerciseUserColors(browser, fixture, evidence) {
   await browser.waitUntil(async () => (await author('color-live-late').getAttribute('data-tmc-color-source')) === 'lookup');
   fixture.releaseColors();
   const currentProfile = await browser.$('[data-tmc-account-select]').getValue();
-  await browser.executeAsync((profileId, done) => {
-    globalThis.window.tmc.chat.getUserColors({ profileId, channel: 'fixture-channel', usernames: ['fixture_color_late'] })
-      .then(() => done(true), () => done(false));
+  await browser.execute(async (profileId) => {
+    return globalThis.window.tmc.chat.getUserColors({ profileId, channel: 'fixture-channel', usernames: ['fixture_color_late'] })
+      .then(() => true, () => false);
   }, currentProfile);
   assert.equal(await color('color-live-tagged'), 'rgb(18, 52, 86)', 'A late API response cannot overwrite an actual live tag');
   assert.equal(await color('color-live-late'), 'rgb(18, 52, 86)');

@@ -211,7 +211,7 @@ try {
     outDir: path.join(output, 'build'),
     emptyOutDir: false,
     lib: { entry: path.join(project, 'tests/e2e/bootstrap.ts'), formats: ['cjs'], fileName: () => 'main.cjs' },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['electron', ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
       output: { inlineDynamicImports: true },
       plugins: [{ name: 'local-player-frame', enforce: 'pre', transform(code, id) {
@@ -233,8 +233,8 @@ try {
   } });
   await build({ ...shared, build: {
     outDir: path.join(output, 'build'), emptyOutDir: false,
-    lib: { entry: path.join(project, 'src/preload.ts'), formats: ['cjs'], fileName: () => 'preload.js' },
-    rollupOptions: { external: ['electron'] },
+    lib: { entry: path.join(project, 'src/preload.ts'), formats: ['cjs'], fileName: () => 'preload.cjs' },
+    rolldownOptions: { external: ['electron'] },
   } });
   await build({ configFile: false, envFile: false, root: project, base: './',
     plugins: [appVersionPlugin('e2e')],
@@ -323,10 +323,10 @@ try {
   assert.deepEqual(fixture.requests.filter((entry) => entry.phase === 'restart' && entry.path === '/restore')
     .map((entry) => entry.profileId), ['B']);
   await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected', { timeout: 20000 });
-  const restartedFavorites = await browser.executeAsync((done) => {
-    globalThis.window.tmc.emotes.getCatalog({ profileId: 'B', channel: 'fixture-channel' }).then(
-      (catalog) => done({ favorites: catalog.favorites.map((emote) => emote.name), failed: catalog.favoritesSaveFailed }),
-      () => done({ failed: true }),
+  const restartedFavorites = await browser.execute(async () => {
+    return globalThis.window.tmc.emotes.getCatalog({ profileId: 'B', channel: 'fixture-channel' }).then(
+      (catalog) => ({ favorites: catalog.favorites.map((emote) => emote.name), failed: catalog.favoritesSaveFailed }),
+      () => ({ failed: true }),
     );
   });
   assert.deepEqual(restartedFavorites, { favorites: ['Kappa', 'Keepo'], failed: false }, 'Fresh Electron process restores only B favorites');

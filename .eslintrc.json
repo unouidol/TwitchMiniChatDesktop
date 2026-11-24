@@ -13,6 +13,11 @@
     "plugin:import/typescript"
   ],
   "parser": "@typescript-eslint/parser",
+  "settings": {
+    "import/resolver": {
+      "typescript": {}
+    }
+  },
   "overrides": [
     {
       "files": ["tests/e2e/*.mjs", "tests/e2e/*.ts"],

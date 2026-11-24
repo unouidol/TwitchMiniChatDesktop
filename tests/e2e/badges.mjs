@@ -27,7 +27,10 @@ export async function exerciseBadges(browser, fixture, evidence, readNativeViews
   assert.equal((await browser.$$('[data-tmc-message-id="badge-missing"] [data-tmc-badge]')).length, 0);
   await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected');
   fixture.sendBadgeMessage();
-  await browser.$('[data-tmc-message-id="badge-live"] img').waitForDisplayed();
+  await browser.waitUntil(async () => {
+    const images = await browser.$$('[data-tmc-message-id="badge-live"] img');
+    return images.length === 2 && await images[0].isDisplayed() && await images[1].isDisplayed();
+  });
   assert.equal((await browser.$$('[data-tmc-message-id="badge-live"] img')).length, 2);
   assert.deepEqual(await settledNativeViews(browser, readNativeViews), nativeBefore);
   await browser.saveScreenshot(path.join(evidence, 'chat-badges.png'));
