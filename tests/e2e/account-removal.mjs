@@ -89,7 +89,8 @@ async function readPlayback() {
 }
 async function closeOwnedPlayerWindow() {
   const command = path.join(root, 'first-close-player');
-  await fs.writeFile(command, 'close-owned-detached-player', { flag: 'wx' });
+  await fs.writeFile(`${command}.tmp`, 'close-owned-detached-player', { flag: 'wx' });
+  await fs.rename(`${command}.tmp`, command);
   await waitFor(async () => {
     try { await fs.access(`${command}.ack`); return true; }
     catch (error) { if (error.code === 'ENOENT') return false; throw error; }
@@ -101,7 +102,9 @@ async function closeOwnedPlayerWindow() {
 async function resizeOwnedWindow(width, height) {
   const sequence = ++windowSizeSequence;
   const command = path.join(root, `first-window-size-${sequence}.json`);
-  await fs.writeFile(command, JSON.stringify({ width, height }), { flag: 'wx' });
+  // Electron polls for this name; publish it only after the entire payload closes.
+  await fs.writeFile(`${command}.tmp`, JSON.stringify({ width, height }), { flag: 'wx' });
+  await fs.rename(`${command}.tmp`, command);
   const acknowledgement = path.join(root, `first-window-size-${sequence}.ack.json`);
   await waitFor(async () => {
     try { await fs.access(acknowledgement); return true; }

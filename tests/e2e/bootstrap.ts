@@ -205,7 +205,9 @@ void app.whenReady().then(async () => {
     const playback = JSON.stringify({ status: services.player.getStatus(), sourceActive: !!source, destroyed: [...destroyedContents], playerViews, mainWindowId: window.id });
     if (playback !== previousPlayback) {
       if (++playbackRevision > 512) fail('Playback observation limit exceeded');
-      fs.writeFileSync(path.join(root, `${phase}-playback-${playbackRevision}.json`), playback);
+      const playbackPath = path.join(root, `${phase}-playback-${playbackRevision}.json`);
+      fs.writeFileSync(`${playbackPath}.tmp`, playback);
+      fs.renameSync(`${playbackPath}.tmp`, playbackPath);
       previousPlayback = playback;
     }
     const sizePath = path.join(root, `${phase}-window-size-${sizeCommand + 1}.json`);
@@ -217,7 +219,9 @@ void app.whenReady().then(async () => {
       assert.ok(typeof height === 'number' && Number.isInteger(height) && height >= 650 && height <= 1400);
       const previous = window.getBounds();
       window.setSize(width, height);
-      fs.writeFileSync(path.join(root, `${phase}-window-size-${++sizeCommand}.ack.json`), JSON.stringify(previous));
+      const acknowledgement = path.join(root, `${phase}-window-size-${++sizeCommand}.ack.json`);
+      fs.writeFileSync(`${acknowledgement}.tmp`, JSON.stringify(previous));
+      fs.renameSync(`${acknowledgement}.tmp`, acknowledgement);
     }
     if (window.isDestroyed()) return;
     const closePlayerPath = path.join(root, `${phase}-close-player`);
@@ -273,7 +277,8 @@ void app.whenReady().then(async () => {
   assert.deepEqual(rendererSurface, { nodeAvailable: false, isolatedBridge: true });
   const rendererMetric = app.getAppMetrics().find((metric) => metric.pid === window.webContents.getOSProcessId());
   assert.equal(rendererMetric?.sandboxed, true, 'Renderer must be sandboxed at OS level');
-  fs.writeFileSync(path.join(root, `${phase}.json`), JSON.stringify({
+  const startupReport = path.join(root, `${phase}.json`);
+  fs.writeFileSync(`${startupReport}.tmp`, JSON.stringify({
     pid: process.pid,
     profile: app.getPath('userData'),
     savedProfiles: saved.map((entry) => entry.profileId).sort(),
@@ -283,4 +288,5 @@ void app.whenReady().then(async () => {
     rendererSurface,
     rendererSandboxed: rendererMetric?.sandboxed,
   }));
+  fs.renameSync(`${startupReport}.tmp`, startupReport);
 });

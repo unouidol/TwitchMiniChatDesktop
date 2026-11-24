@@ -100,3 +100,17 @@ WDIO's array-map result is asynchronous and cannot be passed directly to native
 Node's experimental module-mocking and package deprecation diagnostics are not filtered.
 Hosted CI needs its own exact commit/run evidence; older green runs do not qualify
 this change. Local output and profiles are excluded from Git.
+
+The first hosted candidate, `bdb3aa7`, passed quality/driver/guard/cleanup checks in
+[run 45406959162](https://github.com/unouidol/TwitchMiniChatDesktop/actions/runs/45406959162)
+but failed the UI scenario: Electron parsed an incompletely written resize command
+and exited with `Unexpected end of JSON input`. The artifact ZIP was verified
+against its GitHub SHA-256 digest before inspection. The only bootstrap JSON parser
+consumes this command; the parent created its visible name before its asynchronous
+write completed. This is a test-control publication race, not an accepted CI pass.
+
+The follow-up publishes resize/close commands and one-time startup, resize-ack and
+playback reports only after closed-file writes and rename, matching existing bounds
+and network snapshots. Pollers retain exact final names; temporary files cannot
+satisfy them. There is no timeout increase, parse-error suppression, retry or
+production change. The corrected head requires a new hosted result.
