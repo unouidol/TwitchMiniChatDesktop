@@ -5,6 +5,16 @@ It is an orientation aid; inspect code and callers before changing behavior.
 
 ## Current boundaries
 
+Forge packages the production Vite output in an integrity-protected ASAR. The
+Windows executable is TMC-desktop.exe; internal package/profile identity stays
+unchanged. Packaged configuration uses app.getVersion() for diagnostics and skips
+working-directory local.properties; environment overrides remain supported.
+First launch without an active session shows login guidance rather than invoking
+authenticated history. The separate [packaged smoke test](windows-local-package.md)
+launches the unmodified protected artifact with an isolated native profile and
+checks local UI/IPC/preferences/restart; installer and real-login acceptance are
+distinct from these automated observations.
+
 Live video is opt-in through Show live for the actually opened channel. The
 renderer measures a resizable host above chat; main owns one TmcPlayerManager,
 one playback WebContentsView and at most one separate video window. It embeds
