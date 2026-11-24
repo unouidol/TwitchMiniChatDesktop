@@ -3,6 +3,9 @@
 The current dependency/runtime baseline and remaining development-tool findings
 are recorded in [the November dependency review](security/dependency-review-2026-11.md).
 Forge emits `.vite/build/main.cjs` and `preload.cjs`; both entry paths are explicit.
+The existing PCG owner shares identical pending activations and retains the exact
+already-loaded context; account/channel changes still reject stale completions.
+Load failures remain explicit, including aborted navigations.
 
 This document separates the current implementation from desired invariants.
 It is an orientation aid; inspect code and callers before changing behavior.

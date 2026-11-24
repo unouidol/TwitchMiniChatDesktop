@@ -53,6 +53,10 @@ export class TmcPcgSessionManager {
   private detachedPanelWindow: BrowserWindow | null = null;
   private stopTwitchAuthObservation: (() => void) | null = null;
   private activationRevision = 0;
+  private pendingActivation: {
+    profileId: string; channel: string; url: string; revision: number;
+    promise: Promise<TmcPcgStatus>;
+  } | null = null;
 
   constructor(
     private readonly config: TmcRuntimeConfig,
@@ -281,12 +285,12 @@ export class TmcPcgSessionManager {
     channel: string,
     ownerWindow?: BrowserWindow | null,
   ): Promise<TmcPcgStatus> {
-    const activation = ++this.activationRevision;
     let key: TmcPcgSessionKey;
 
     try {
       key = this.normalizeKey(profileId, channel);
     } catch (error) {
+      ++this.activationRevision;
       return this.setStatus({
         state: 'error',
         displayMode: this.status.displayMode,
@@ -299,6 +303,7 @@ export class TmcPcgSessionManager {
     const url = buildPcgExtensionUrl(this.config, key.channel);
 
     if (!url) {
+      ++this.activationRevision;
       return this.setStatus({
         state: 'error',
         displayMode: this.status.displayMode,
@@ -308,6 +313,20 @@ export class TmcPcgSessionManager {
       });
     }
 
+    const contents = this.view?.webContents;
+    if (contents && !contents.isDestroyed() && this.status.profileId === key.profileId &&
+      this.status.channel === key.channel && this.panelUrl === url) {
+      if (ownerWindow) this.attachViewToWindow(ownerWindow);
+      this.applyCurrentBounds();
+      const pending = this.pendingActivation;
+      if (pending && pending.revision === this.activationRevision && pending.profileId === key.profileId &&
+        pending.channel === key.channel && pending.url === url && this.status.state === 'loading') {
+        return pending.promise;
+      }
+      if (this.status.state === 'active' && contents.getURL() === url) return this.status;
+    }
+
+    const activation = ++this.activationRevision;
     this.panelUrl = url;
     this.setStatus({
       state: 'loading',
@@ -318,6 +337,18 @@ export class TmcPcgSessionManager {
       message: null,
     });
 
+    const pending = { ...key, url, revision: activation,
+      promise: this.loadPanel(key, url, ownerWindow || null, activation) };
+    this.pendingActivation = pending;
+    try {
+      return await pending.promise;
+    } finally {
+      if (this.pendingActivation === pending) this.pendingActivation = null;
+    }
+  }
+
+  private async loadPanel(key: TmcPcgSessionKey, url: string, ownerWindow: BrowserWindow | null,
+    activation: number): Promise<TmcPcgStatus> {
     try {
       const view = this.ensureView(key.profileId, ownerWindow || null);
       this.applyCurrentBounds();

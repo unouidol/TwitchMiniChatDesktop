@@ -82,7 +82,8 @@ installed v1.1.0-dev.19 and saved accounts are not changed by these checks.
 Local verification with Node 24.22.3/npm 11.19.1 passed:
 
 - `npm ci`, including the explicit pinned Electron installation.
-- `npm test`: 206/206; `npm run typecheck`; `npm run lint`: zero warnings.
+- `npm test`: initially 206/206, then 209/209 with the PCG overlap regressions below;
+  `npm run typecheck`; `npm run lint`: zero warnings.
 - Driver integrity/configuration checks 4/4, network-guard checks and cleanup 12/12.
 - `npm run test:e2e`: full UI/removal/restart, evidence
   `evidence-tmc-electron-e2e-Ebm4bA`, profile removed.
@@ -114,3 +115,17 @@ playback reports only after closed-file writes and rename, matching existing bou
 and network snapshots. Pollers retain exact final names; temporary files cannot
 satisfy them. There is no timeout increase, parse-error suppression, retry or
 production change. The corrected head requires a new hosted result.
+
+A subsequent local qualification (`evidence-tmc-electron-e2e-B5mSzD`) reached
+the player checks but exposed a PCG `ERR_ABORTED` state. Renderer account and
+channel events can both activate the identical PCG context; the main owner was
+starting a second `loadURL` even while the first identical request was pending.
+The exact internal Electron event ordering behind that abort is not established.
+
+The existing PCG manager now shares an identical in-flight activation and retains
+an already active exact URL/view. Different identities/channels still advance its
+revision; stale completions cannot publish, and only the pending operation's owner
+clears it. Genuine failures, including `ERR_ABORTED`, remain errors and can be
+retried by a later explicit activation. Three focused regressions cover pending/
+ready reuse, shared failure/retry and superseded shared navigation. There is no
+blanket abort suppression, automatic command replay, session eviction or new store.
