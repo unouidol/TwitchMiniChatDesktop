@@ -37,6 +37,14 @@ export async function startFixture() {
       const url = new URL(request.url, 'http://127.0.0.1');
       let body = '';
       for await (const chunk of request) body += chunk;
+      if (url.pathname === '/desktop-release') {
+        assert.equal(request.method, 'GET'); assert.equal(request.headers.authorization, undefined); assert.equal(request.headers.cookie, undefined);
+        response.setHeader('Content-Type', 'application/json');
+        response.end(JSON.stringify({ tag_name: 'v99.0.0', draft: false, prerelease: false,
+          assets: [{ name: 'TMC-desktop-Setup.exe', state: 'uploaded', size: 140000000,
+            browser_download_url: 'https://github.com/unouidol/TwitchMiniChatDesktop/releases/download/v99.0.0/TMC-desktop-Setup.exe' }] }));
+        return;
+      }
       if (request.method === 'GET' && url.pathname.startsWith('/twitch/')) {
         if (catalogGate) { catalogBlockedRequests.push(url.pathname); await catalogGate; }
         const token = request.headers.authorization;

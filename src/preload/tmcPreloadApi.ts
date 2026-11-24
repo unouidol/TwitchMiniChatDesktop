@@ -11,6 +11,7 @@ import type {
   TmcSetActiveAccountRequest,
 } from '../shared/accounts/TmcAccountModels';
 import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
+import type { TmcWelcomeSnapshot, TmcWelcomeApi } from '../shared/app/TmcWelcome';
 import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
 import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
 import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
@@ -305,6 +306,7 @@ export type TmcPcgPreloadApi = {
  * file system APIs, or unrestricted Inter-Process Communication.
  */
 export type TmcPreloadApi = {
+  readonly welcome: TmcWelcomeApi;
   readonly emotes: { readonly getCatalog: (request: TmcEmoteCatalogRequest) => Promise<TmcEmoteCatalog> };
   /**
    * Returns basic application information for the local UI.
@@ -568,6 +570,16 @@ const IPC_PCG_HOLD_ACTIVE_SESSION = resolveIpcChannel(
  */
 function createTmcPreloadApi(): TmcPreloadApi {
   return {
+    welcome: {
+      start: () => ipcRenderer.invoke(TMC_IPC_CHANNELS.WELCOME_START),
+      getState: () => ipcRenderer.invoke(TMC_IPC_CHANNELS.WELCOME_GET),
+      check: () => ipcRenderer.invoke(TMC_IPC_CHANNELS.WELCOME_CHECK),
+      onChanged: (listener) => {
+        const handler = (_event: IpcRendererEvent, value: TmcWelcomeSnapshot): void => listener(value);
+        ipcRenderer.on(TMC_IPC_CHANNELS.WELCOME_CHANGED, handler);
+        return () => ipcRenderer.removeListener(TMC_IPC_CHANNELS.WELCOME_CHANGED, handler);
+      },
+    },
     getAppInfo: (): TmcAppInfo => ({
       appName: 'TMC desktop',
       platform: process.platform,

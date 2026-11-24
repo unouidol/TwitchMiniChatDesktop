@@ -5,6 +5,14 @@ It is an orientation aid; inspect code and callers before changing behavior.
 
 ## Current boundaries
 
+The [local welcome and release check](welcome-and-updates.md) is owned by one
+main-process welcome service and a typed trusted IPC surface. It persists only
+public release/check/presentation state, separately from accounts. Packaged stable
+startup performs a bounded daily GitHub metadata check; dev builds check only on
+request. The bundled modal is available from the header menu, and shares native
+PCG/player occlusion with login without unloading either surface. Cloudflare hosts
+the project website; it is not required in the desktop update transport.
+
 Forge packages the production Vite output in an integrity-protected ASAR. The
 Windows executable is TMC-desktop.exe; internal package/profile identity stays
 unchanged. Packaged configuration uses app.getVersion() for diagnostics and skips

@@ -33,6 +33,20 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     assert.equal(first.playerViews[0].windowId, first.mainWindowId);
     assert.deepEqual(first.playerViews[0].security, { bridge: 'undefined', node: 'undefined', process: 'undefined', persistent: false, sandboxed: true });
     const pcgOnly = await settledNativeViews(browser, async () => (await readNativeViews()).filter((view) => view.id !== videoId));
+    await browser.$('[data-tmc-account-menu] summary').click();
+    await browser.$('[data-tmc-welcome-open]').click();
+    await browser.$('[data-tmc-welcome-dialog]').waitForDisplayed();
+    await browser.waitUntil(async () => (await readPlayback()).playerViews[0]?.bounds.width === 0);
+    const selected = await browser.$('[data-tmc-account-select]').getValue();
+    await browser.$('[data-tmc-welcome-check]').click();
+    await browser.waitUntil(async () => (await browser.$('[data-tmc-welcome-status]').getText()).includes('99.0.0 is available'));
+    await browser.$('[data-tmc-welcome-download]').click();
+    await browser.saveScreenshot(path.join(evidence, 'welcome-update.png'));
+    await browser.$('[data-tmc-welcome-close]').click();
+    await browser.waitUntil(async () => (await readPlayback()).playerViews[0]?.bounds.width >= 400);
+    assert.equal((await readPlayback()).playerViews[0].id, videoId, 'Welcome preserves the playing native surface');
+    assert.equal(await browser.$('[data-tmc-account-select]').getValue(), selected);
+    assert.deepEqual(await settledNativeViews(browser, async () => (await readNativeViews()).filter((view) => view.id !== videoId)), pcgOnly);
     const geometry = await browser.execute(`return { host: document.querySelector('[data-tmc-player-host]').getBoundingClientRect().height,
       feed: document.querySelector('.tmc-chat-feed').getBoundingClientRect().height,
       composer: document.querySelector('#composerForm').getBoundingClientRect().bottom, viewport: innerHeight }`);

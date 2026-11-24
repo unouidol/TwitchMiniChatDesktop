@@ -1,8 +1,9 @@
 import { appendLocalMessage } from '../chat/appendLocalMessage';
+import { TMC_LOCAL_DIALOG_CHANGED_EVENT, isLocalDialogVisible } from '../dialogs/TmcLocalDialog';
 import { notifyAuthLoggedIn } from '../chat/TmcChannelChatController';
 import type { StartTwitchLoginResult, FinalizeTwitchLoginResult } from '../../shared/auth/TmcAuthModels';
 
-export const TMC_AUTH_DIALOG_CHANGED_EVENT = 'tmc:auth:dialog-changed';
+export const TMC_AUTH_DIALOG_CHANGED_EVENT = TMC_LOCAL_DIALOG_CHANGED_EVENT;
 
 type LoginStep = 'intro' | 'opening' | 'code' | 'submitting';
 
@@ -85,7 +86,7 @@ export async function initializeAuthPanel(): Promise<void> {
   }
 
   trigger.addEventListener('click', async () => {
-    if (dialog.open || dialog.dataset.opening === 'true') return;
+    if (isLocalDialogVisible()) return;
     reset();
     const current = flow;
     dialog.dataset.opening = 'true';

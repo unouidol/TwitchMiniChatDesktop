@@ -33,6 +33,14 @@ button:disabled {
   opacity: 0.65;
 }
 
+.tmc-welcome-dialog { width: min(620px, calc(100vw - 40px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid #39435b; border-radius: 18px; color: #edf0fa; background: #111827; }
+.tmc-welcome-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.tmc-welcome-dialog [hidden] { display: none; }
+.tmc-welcome-content { padding: 20px; display: flex; flex-direction: column; gap: 12px; font-size: 0.9rem; }
+.tmc-welcome-content p, .tmc-welcome-content h2, .tmc-welcome-content h3 { margin: 0; }
+.tmc-welcome-content p { line-height: 1.45; }
+.tmc-welcome-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tmc-welcome-updates { border-top: 1px solid #39435b; padding-top: 16px; display: flex; flex-direction: column; gap: 12px; }
 .tmc-shell {
   display: flex;
   flex-direction: column;

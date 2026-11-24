@@ -7,5 +7,5 @@
     "outDir": ".test-build",
     "sourceMap": false
   },
-  "include": ["src/main/ipc/registerIpcHandlers.ts", "src/main/windows/createMainWindow.ts", "src/main/player/registerPlayerShutdown.ts", "src/renderer/chat/TmcChatScrollController.ts", "src/renderer/chat/TmcChatNameColorController.ts", "src/renderer/chat/TmcChatCompletion.ts", "src/renderer/chat/TmcChatBadgeController.ts", "src/renderer/chat/TmcChatSearchController.ts"]
+  "include": ["src/main/ipc/registerIpcHandlers.ts", "src/main/windows/createMainWindow.ts", "src/main/player/registerPlayerShutdown.ts", "src/renderer/chat/TmcChatScrollController.ts", "src/renderer/chat/TmcChatNameColorController.ts", "src/renderer/chat/TmcChatCompletion.ts", "src/renderer/chat/TmcChatBadgeController.ts", "src/renderer/chat/TmcChatSearchController.ts", "src/renderer/welcome/initializeWelcome.ts"]
 }
