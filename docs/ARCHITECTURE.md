@@ -23,6 +23,14 @@ launches the unmodified protected artifact with an isolated native profile and
 checks local UI/IPC/preferences/restart; installer and real-login acceptance are
 distinct from these automated observations.
 
+Windows installer lifecycle events are owned by handleSquirrelStartup before
+normal app readiness/services. Its bounded, hidden Update.exe worker explicitly
+creates/removes Desktop and Start Menu links, and determines success before the
+installer app exits. The distinct Windows shortcut label TMC desktop (installata)
+preserves development links. Obsolete events exit without a worker; normal and
+first-run launches retain regular startup. The protected fixture substitutes only
+the updater boundary; real shortcut creation has a separate silent-install check.
+
 Live video is opt-in through Show live for the actually opened channel. The
 renderer measures a resizable host above chat; main owns one TmcPlayerManager,
 one playback WebContentsView and at most one separate video window. It embeds

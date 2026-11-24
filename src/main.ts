@@ -1,5 +1,5 @@
 ﻿import { app, BrowserWindow } from 'electron';
-import started from 'electron-squirrel-startup';
+import { handleSquirrelStartup } from './main/windows/handleSquirrelStartup';
 import { createMainWindow } from './main/windows/createMainWindow';
 import { registerIpcHandlers } from './main/ipc/registerIpcHandlers';
 import { TMC_RUNTIME_CONFIG } from './main/config/TmcRuntimeConfig';
@@ -7,37 +7,22 @@ import { registerPlayerShutdown } from './main/player/registerPlayerShutdown';
 
 /*
  * Handles creating/removing shortcuts on Windows when installing/uninstalling.
- * Keep this near app startup because Squirrel may need to quit the app early.
+ * The installer handler owns exit after Update.exe completes. Never quit it early or
+ * initialize normal windows/services while processing installer events.
  */
-if (started) {
-  app.quit();
-}
-
-/**
- * Initializes the Electron application.
- * IPC handlers must be registered before the renderer window is created.
- */
-app.whenReady().then(async () => {
-  const services = await registerIpcHandlers(TMC_RUNTIME_CONFIG);
-  registerPlayerShutdown(services.player);
-  createMainWindow();
-});
-
-app.on('window-all-closed', () => {
-  /*
-   * macOS apps usually stay active until the user quits explicitly.
-   */
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('activate', () => {
-  /*
-   * Re-create the window on macOS when the dock icon is clicked and no windows
-   * are currently open.
-   */
-  if (BrowserWindow.getAllWindows().length === 0) {
+if (!handleSquirrelStartup()) {
+  // Register trusted IPC before creating the local renderer window.
+  app.whenReady().then(async () => {
+    const services = await registerIpcHandlers(TMC_RUNTIME_CONFIG);
+    registerPlayerShutdown(services.player);
     createMainWindow();
-  }
-});
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+  });
+}

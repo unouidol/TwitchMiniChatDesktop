@@ -177,6 +177,10 @@ Use `npm run package` for packaging changes and before releases; packaging is no
 part of this quality workflow and does not establish correct authentication.
 For the local Windows installer and the separate protected-artifact smoke test,
 see [local Windows packaging](docs/windows-local-package.md).
+The separate `npm run test:squirrel` exercises the protected installer event
+lifecycle against an owned updater fixture. It does not install into user profiles;
+real installer tests require their own authorized, scoped verification and must
+preserve user/development links and avoid starting authenticated services.
 
 ## Continuous integration
 

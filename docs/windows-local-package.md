@@ -21,6 +21,40 @@ diagnostics use Electron's application version. Packaged startup does not read
 `local.properties` from the working directory. Environment configuration remains
 supported; no backend/history secret is embedded or copied into the package.
 
+## Installer shortcuts and event lifecycle
+
+The Windows PE ProductName is **TMC desktop (installata)**. Squirrel uses this
+metadata to name the Desktop and Start Menu shortcuts; the distinct label avoids
+replacing the existing TMC desktop development links. The shortcut targets the
+stable executable stub in the per-user installation root, not an app-version
+directory that becomes obsolete on an upgrade. Internal package/productName and
+profile locations remain unchanged.
+
+Main handles install/update/uninstall events before normal service/window startup.
+One bounded updater process receives explicit `Desktop,StartMenu` locations;
+normal services do not run during these events. The app exits only after updater
+completion, with non-success for spawn/exit/deadline failures. Obsolete versions
+exit directly; first-run and ordinary launches retain normal startup. The old
+electron-squirrel-startup helper/types and its exclusive dependencies were removed
+because early quit and intermittent event completion were observed with it.
+
+After making a package, `npm run test:squirrel` copies the unmodified protected
+app to a marked workspace fixture and replaces only the sibling Update.exe with
+a delayed .NET Framework boundary executable. The test requires Windows x64's
+Framework64 v4 compiler. It verifies actual install/update/uninstall/obsolete
+event timing and arguments, excludes normal preference initialization, confirms
+fixture processes exit and removes only the verified profile/app copy. This test
+does not write real shortcuts and is not proof of a real installation by itself.
+
+On 2026-11-24 an explicitly authorized silent installer check upgraded the user's
+existing installation to 1.1.0-dev.19 without opening the app. Starting with the
+installed Desktop link absent, Squirrel created both Desktop and Start Menu links
+to the standard per-user stable launcher. Both development link hashes remained
+unchanged; installed ASAR matched the protected package, and no app was left open.
+This establishes shortcut creation on this host, not a clean-machine or real-login
+acceptance test. SQUIRREL_TEMP was found to also redirect the installation root;
+it must not be used merely to isolate logs in a standard-location installer check.
+
 ## Protected-artifact smoke test
 
 Provision the checksum-pinned ChromeDriver using the existing
