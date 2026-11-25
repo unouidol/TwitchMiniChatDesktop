@@ -94,3 +94,28 @@ reason codes are allowlisted before logging; provider bodies, token values and
 untrusted exception text are never emitted. This diagnostic increment passes
 218 behavior tests, typecheck and zero-warning lint. The real field-level result
 and corrective change remain pending; it does not claim badge acceptance passed.
+
+The next scoped manual package identified `Invalid badge set ID length` after a
+successful global HTTP response (`badge-package-diagnostic-RZVF4B`). The old shared
+parser allowed only 64 characters. The correction raises the bounded ASCII
+set/version identifier length to 256, preserving its character grammar, raw tag /
+entry / catalog bounds and fixed image URL validation. It does not ignore invalid
+entries or silently downgrade catalog failures. Safe failure codes also distinguish
+set versus version and type/length/characters without logging the provider value.
+The diagnostic did not expose the real ID or its exact length; real acceptance of
+the larger bound remains required rather than inferred from a synthetic fixture.
+
+Local checks passed 219 behavior tests, typecheck, zero-warning lint and the full
+Electron scenario (`evidence-tmc-electron-e2e-vueFHG`, owned profile removed).
+The provider fixture now includes an unused 89-character set ID: the prior parser
+rejected the entire global catalog, while the corrected parser preserves normal
+history/live icons. Unit tests cover long IDs and rejection beyond 256 characters.
+Independent review found no confirmed defect in this delta. A separate dev.24
+local candidate distinguishes this correction from the installed failing dev.23;
+its packaging, hosted result and real provider acceptance need their own evidence.
+
+The development diagnostic window was reported unusable; that experiment was
+stopped. Manual diagnostics use the protected packaged rendering instead. The
+launcher also stopped requesting hidden-window startup for the interactive app;
+Windows then reported a visible main window. This tooling correction does not
+claim to resolve the separate development-rendering observation.

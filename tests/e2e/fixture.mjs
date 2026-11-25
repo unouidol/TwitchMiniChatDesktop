@@ -74,7 +74,8 @@ export async function startFixture() {
         }
         let data;
         if (url.pathname === '/twitch/helix/chat/badges/global' || url.pathname === '/twitch/helix/chat/badges') {
-          const sets = url.pathname.endsWith('/global') ? ['moderator', 'vip', 'broadcaster', 'subscriber'] : ['subscriber', 'founder'];
+          // Twitch campaign set IDs can exceed 64 characters; an unused valid set must not reject the entire catalog.
+          const sets = url.pathname.endsWith('/global') ? ['moderator', 'vip', 'broadcaster', 'subscriber', `campaign-${'a'.repeat(80)}`] : ['subscriber', 'founder'];
           const offset = url.pathname.endsWith('/global') ? 1 : 5;
           data = sets.map((set_id, index) => ({ set_id, versions: [{ id: '1', title: `${offset === 5 ? 'Channel ' : ''}${set_id}`,
             image_url_2x: `https://static-cdn.jtvnw.net/badges/v1/00000000-0000-0000-0000-00000000000${offset + index}/2` }] }));

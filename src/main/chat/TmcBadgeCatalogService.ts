@@ -5,7 +5,9 @@ import { isTwitchBadgeImage, readChatBadges, type TmcBadgeCatalog, type TmcBadge
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const safeFailureReasons = new Set(['Badge provider unavailable.', 'Invalid badge response.', 'Invalid badge identity.',
   'Invalid badge channel.', 'Invalid badge sets.', 'Invalid badge versions.', 'Invalid badge version.',
-  'Invalid badge metadata identity.', 'Invalid badge title.', 'Empty badge title.', 'Oversized badge title.',
+  'Invalid badge metadata identity.', 'Invalid badge set ID type.', 'Invalid badge set ID length.', 'Invalid badge set ID characters.',
+  'Invalid badge version ID type.', 'Invalid badge version ID length.', 'Invalid badge version ID characters.',
+  'Invalid badge title.', 'Empty badge title.', 'Oversized badge title.',
   'Invalid badge image URL.', 'Duplicate or excessive badges.', 'Badge catalog exceeds bounds.']);
 
 /** Owns public badge definitions; credentials and provider decisions stay in main. */
@@ -91,7 +93,12 @@ function parseCatalog(value: Record<string, unknown>): TmcBadgeImage[] {
     for (const version of set.versions) {
       if (!object(version)) throw new Error('Invalid badge version.');
       const [identity] = readChatBadges([{ setId: set.set_id, version: version.id }]);
-      if (!identity) throw new Error('Invalid badge metadata identity.');
+      if (!identity) {
+        const field = readChatBadges([{ setId: set.set_id, version: '1' }]).length ? 'version' : 'set';
+        const value: unknown = field === 'version' ? version.id : set.set_id;
+        const cause = typeof value !== 'string' ? 'type' : !value.length || value.length > 256 ? 'length' : 'characters';
+        throw new Error(`Invalid badge ${field} ID ${cause}.`);
+      }
       if (typeof version.title !== 'string') throw new Error('Invalid badge title.');
       if (!version.title.trim()) throw new Error('Empty badge title.');
       if (version.title.length > 200) throw new Error('Oversized badge title.');

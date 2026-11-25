@@ -39,6 +39,20 @@ test('channel badge versions override globals, concurrent requests deduplicate a
   assert.doesNotMatch(JSON.stringify(first), /synthetic-only|accessToken/);
 });
 
+test('long Twitch badge identities preserve a usable global/channel catalog with bounded metadata', async () => {
+  const longId = `campaign-${'a'.repeat(80)}`;
+  assert.deepEqual(readChatBadges(`${longId}/1`), [{ setId: longId, version: '1' }]);
+  assert.deepEqual(readChatBadges([{ setId: 'x'.repeat(257), version: '1' }]), []);
+  assert.deepEqual(readChatBadges([{ setId: 'event', version: '1'.repeat(257) }]), []);
+  global.fetch = provider(() => session, [], (value, url) => url.endsWith('/global')
+    ? { data: [...value.data, { set_id: longId, versions: [{ id: '1', title: 'Campaign badge', image_url_2x: image(3) }] }] } : value);
+  const catalog = await new TmcBadgeCatalogService(() => session).getCatalog(request);
+  assert.equal(catalog.status, 'ready');
+  assert.deepEqual(catalog.badges.find((badge) => badge.setId === longId),
+    { setId: longId, version: '1', title: 'Campaign badge', imageUrl: image(3) });
+  assert.equal(catalog.badges.find((badge) => badge.setId === 'subscriber').title, 'Channel');
+});
+
 test('stale account and rotated token completions are rejected rather than published to the selected account', async () => {
   for (const changed of [{ ...session, profileId: 'B' }, { ...session, accessToken: 'synthetic-rotated' }]) {
     let active = session;
@@ -90,7 +104,7 @@ test('badge diagnostics identify invalid metadata fields without logging provide
   for (const [change, reason] of [
     [(entry) => { entry.title = ''; }, 'Empty badge title.'],
     [(entry) => { entry.image_url_2x = 'https://private.invalid/sensitive-provider-field'; }, 'Invalid badge image URL.'],
-    [(entry) => { entry.id = 'invalid/sensitive-provider-field'; }, 'Invalid badge metadata identity.'],
+    [(entry) => { entry.id = 'invalid/sensitive-provider-field'; }, 'Invalid badge version ID characters.'],
   ]) {
     global.fetch = provider(() => session, [], (value, url) => {
       if (url.endsWith('/global')) change(value.data[0].versions[0]);

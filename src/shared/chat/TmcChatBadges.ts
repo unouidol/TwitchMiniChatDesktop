@@ -2,7 +2,7 @@ export type TmcChatBadge = { readonly setId: string; readonly version: string };
 export type TmcBadgeImage = TmcChatBadge & { readonly title: string; readonly imageUrl: string };
 export type TmcBadgeRequest = { readonly profileId: string; readonly channel: string };
 export type TmcBadgeCatalog = TmcBadgeRequest & { readonly badges: readonly TmcBadgeImage[]; readonly status: 'ready' | 'unavailable' };
-const identifier = (value: unknown): value is string => typeof value === 'string' && /^[a-z0-9_-]{1,64}$/i.test(value);
+const identifier = (value: unknown): value is string => typeof value === 'string' && /^[a-z0-9_-]{1,256}$/i.test(value);
 
 /** Accept only supplied IRC or structured badge identities, never inferred roles. */
 export function readChatBadges(value: unknown): readonly TmcChatBadge[] {
