@@ -80,4 +80,7 @@ absent. Independent defect review found no confirmed actionable defect.
 Initial check failures were a missing test-build entry for the production slot
 builder and browser globals in the new E2E callback; both were corrected without
 weakening assertions. Hosted results and installed/provider acceptance remain
-separate. The package version is unchanged in this source-only increment.
+separate. The user authorized a local dev.23 package after the source-only increment.
+Hosted run 45588946056 passed both Windows jobs at source commit
+`0c0a54382942ff7cd2c18492de717cd374aea859`. The later version-stamped candidate
+requires its own exact-head checks and protected-artifact verification.
