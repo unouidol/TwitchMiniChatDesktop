@@ -103,7 +103,7 @@ const guardedFetch = globalThis.fetch;
 globalThis.fetch = (input, init) => {
   const original = new URL(input instanceof Request ? input.url : String(input));
   if (original.origin === 'https://id.twitch.tv' || original.origin === 'https://api.twitch.tv') {
-    assert.ok(['/oauth2/validate', '/helix/users', '/helix/chat/color', '/helix/chat/badges', '/helix/chat/badges/global', '/helix/chat/emotes', '/helix/chat/emotes/global', '/helix/chat/emotes/user'].includes(original.pathname));
+    assert.ok(['/oauth2/validate', '/helix/users', '/helix/chat/color', '/helix/chat/emotes', '/helix/chat/emotes/global', '/helix/chat/emotes/user'].includes(original.pathname));
     const local = new URL(`/twitch${original.pathname}`, backend.origin);
     local.search = original.search;
     return guardedFetch(local, init);

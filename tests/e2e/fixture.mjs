@@ -73,13 +73,7 @@ export async function startFixture() {
           return;
         }
         let data;
-        if (url.pathname === '/twitch/helix/chat/badges/global' || url.pathname === '/twitch/helix/chat/badges') {
-          const sets = url.pathname.endsWith('/global') ? ['moderator', 'vip', 'broadcaster', 'subscriber'] : ['subscriber', 'founder'];
-          const offset = url.pathname.endsWith('/global') ? 1 : 5;
-          data = sets.map((set_id, index) => ({ set_id, versions: [{ id: '1', title: `${offset === 5 ? 'Channel ' : ''}${set_id}`,
-            image_url_2x: `https://static-cdn.jtvnw.net/badges/v1/00000000-0000-0000-0000-00000000000${offset + index}/2` }] }));
-        }
-        else if (url.pathname === '/twitch/helix/chat/emotes/global') data = [{ id: '25', name: 'Kappa' }];
+        if (url.pathname === '/twitch/helix/chat/emotes/global') data = [{ id: '25', name: 'Kappa' }];
         else if (url.pathname === '/twitch/helix/users') data = [{ id: 'fixture-broadcaster', login: url.searchParams.get('login') }];
         else if (url.pathname === '/twitch/helix/chat/emotes') data = [{ id: '1902', name: 'Keepo' }, { id: '999', name: 'Locked' }];
         else {

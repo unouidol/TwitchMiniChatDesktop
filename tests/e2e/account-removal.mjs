@@ -16,7 +16,7 @@ import { exerciseUserColors } from './user-colors.mjs';
 import { exerciseMentions } from './mentions.mjs';
 import { exerciseAppearance, verifyAppearanceRestart } from './appearance.mjs';
 import { exerciseTimestamps } from './timestamps.mjs';
-import { exerciseBadges } from './badges.mjs';
+import { exerciseBadgeFreeChat } from './badges.mjs';
 import { exerciseSearch } from './search.mjs';
 import { exercisePlayer } from './player.mjs';
 import { appVersionPlugin } from '../../build/appVersion.mjs';
@@ -275,7 +275,7 @@ try {
   await exerciseReplies(browser, fixture, evidence);
   await exerciseUserColors(browser, fixture, evidence);
   await exerciseMentions(browser, fixture, evidence, readNativeViews);
-  await exerciseBadges(browser, fixture, evidence, readNativeViews);
+  await exerciseBadgeFreeChat(browser, fixture, evidence, readNativeViews);
   await exerciseSearch(browser, fixture, evidence, readNativeViews);
   await exercisePlayer(browser, fixture, evidence, readNativeViews, readPlayback, resizeOwnedWindow, closeOwnedPlayerWindow);
   const projectLinks = (await fs.readFile(path.join(root, 'project-link-attempts.txt'), 'utf8')).trim().split('\n');
