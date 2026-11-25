@@ -52,14 +52,15 @@ and verifies live results, account/channel reset, native PCG bounds and no sends
 A held-history response with an actual live IRC arrival proves history commit
 removes temporary/detached search results before replacing the feed.
 
-Badges are not displayed in either history or live chat. The backend history
-contract does not include original badge identities; the user chose consistent
-removal over live-only text fallbacks. The bounded transport metadata parser
-remains covered, but the unused catalog service/bridge/rendering owner is removed.
-Synthetic Electron supplies history and IRC badge metadata and verifies no badge
-labels/images or catalog bridge, preserved message/author colors, account changes,
-unchanged native PCG and no sends. Badge API destinations are not admitted by
-the synthetic transport guard. See [badge display](docs/chat-badge-display.md).
+History and live chat share icon-only badge rendering from original supplied
+badge identities. Unknown definitions and failed images remain hidden without
+text fallbacks. Backend main now stores/returns raw badges and name colors;
+older rows remain valid with null metadata. Unit coverage checks the production
+history contract, catalog isolation/security/cooldown, trusted IPC and bounded
+renderer lifecycle, including late image events. Synthetic Electron substitutes
+only provider/image transports and checks actual image load/error behavior,
+history/live parity, preserved author colors, account changes, unchanged PCG and
+no sends. See [badge display](docs/chat-badge-display.md).
 The full synthetic Electron process has a 180-second watchdog to cover the
 expanded auth/chat/appearance scenario on Windows. Individual production
 request deadlines, assertion timeouts and ownership/network guards are unchanged.

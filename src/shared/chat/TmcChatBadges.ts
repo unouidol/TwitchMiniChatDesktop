@@ -1,4 +1,7 @@
 export type TmcChatBadge = { readonly setId: string; readonly version: string };
+export type TmcBadgeImage = TmcChatBadge & { readonly title: string; readonly imageUrl: string };
+export type TmcBadgeRequest = { readonly profileId: string; readonly channel: string };
+export type TmcBadgeCatalog = TmcBadgeRequest & { readonly badges: readonly TmcBadgeImage[]; readonly status: 'ready' | 'unavailable' };
 const identifier = (value: unknown): value is string => typeof value === 'string' && /^[a-z0-9_-]{1,64}$/i.test(value);
 
 /** Accept only supplied IRC or structured badge identities, never inferred roles. */
@@ -21,4 +24,8 @@ export function readChatBadges(value: unknown): readonly TmcChatBadge[] {
     if (badges.length === 10) break;
   }
   return badges;
+}
+
+export function isTwitchBadgeImage(value: unknown): value is string {
+  return typeof value === 'string' && /^https:\/\/static-cdn\.jtvnw\.net\/badges\/v1\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/[123]$/i.test(value);
 }

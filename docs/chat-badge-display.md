@@ -1,37 +1,83 @@
-# Chat badge display
+# Chat badge icons
 
-Starting with the local dev.21 candidate, both historical and live messages omit
-badge icons and labels. Author names/colors, timestamps, emotes, links and reply
-controls retain their existing behavior.
+The desktop restores badges as icons only in history and live chat. Unknown
+definitions, missing metadata and image failures remain hidden; no role labels
+or broken-image alt text occupy the feed. Titles and accessible icon names remain
+available. Original user colors, emotes, replies and search keep their owners.
 
-During real-account acceptance of installed dev.20, the user reported textual
-badge labels on live messages and no badges in history. The user requested icons
-consistently, or removal if that could not be provided. Source inspection of the
-backend's history store and endpoint confirms the current contract contains user,
-text, timestamp, emotes and message ID; it does not preserve original badge roles.
-Current live roles cannot safely be applied retrospectively to historical messages.
-No server change or deployment is included in this desktop correction.
+## Backend alignment
 
-The old renderer intentionally retained text when badge definitions or images were
-unavailable. The exact provider failure behind the user's missing live icons was
-not established; this change implements the requested removal rather than claiming
-to repair that provider. It removes the badge catalog owner/IPC/preload capability,
-renderer slots/enrichment and CSS, avoiding unused background requests. Existing
-bounded transport metadata and parsing remain compatible and are not displayed.
+Backend main includes commit
+[`b89fcba4972d05d4a1680a2462f20d44bbb62792`](https://github.com/unouidol/tmc-backend/commit/b89fcba4972d05d4a1680a2462f20d44bbb62792)
+(history badge persistence), also present in the inspected local checkout at
+`9abfbdf1ff98293e189c87cbbf0db618497fa55c`. Its commit records production deployment
+on 2026-11-25; this desktop task does not independently verify server deployment.
 
-The synthetic Electron scenario supplies badge identities in history and actual
-IRC traffic, verifies neither labels nor images appear, preserves text and supplied
-author colors, checks account transitions and unchanged PCG bounds, and asserts no
-chat sends. The local bridge has no badge catalog capability. The network guard and
-fixture no longer admit badge-provider endpoints, so an unexpected request fails.
-Removed unit tests exercised the retired catalog/controller/IPC; transport parser
-coverage remains, and the full existing chat/emote/account/player suite still runs.
+The IRC parser and ingestion callback retain `badges`, `badge-info` and `color`;
+the store adds optional columns and the endpoint returns:
 
-Manual dev.20 observations already confirmed installed startup, two saved accounts,
-A/B/A switching and online selected-account restart, history/emote images, channel
-switching, picker search/insertion and separate PCG login. PCG also returned on A
-after account switching without login, and the user reported PCG working after an
-app restart. That final reply did not separately reconfirm the chat account identity.
-Offline startup and real live-video acceptance remain unperformed. Dev.21 needs its
-own installed visual check after isolated tests and packaging; earlier manual
-acceptance does not prove this updated candidate.
+```json
+{
+  "badges": "moderator/1,subscriber/12",
+  "badge_info": "subscriber/14",
+  "color": "#1E90FF"
+}
+```
+
+Missing values and pre-migration rows return null. The existing desktop parser
+already accepts raw badge strings and colors. Icon identity comes from `badges`,
+never `badge_info` (subscriber duration is not the icon version). Old messages
+without identities cannot acquire historically accurate roles retrospectively.
+No backend edit, deployment or authenticated production request is performed here.
+
+## Desktop ownership and failure behavior
+
+Dev.21 removed badge display after installed dev.20 showed live textual labels and
+no historical badges. The historical source contract then lacked roles. The new
+backend contract removes that blocker; this change selectively restores the
+catalog/IPC/renderer owners, without reverting shared PCG/video sessions or
+restoring the unwanted text fallback. The original real provider failure is not
+claimed fixed merely because the backend now preserves metadata.
+
+Main captures the selected account/token, validates identity/channel, loads global
+and channel definitions through the official [Twitch badge APIs](https://dev.twitch.tv/docs/api/reference/chat#get-channel-chat-badges),
+and lets channel definitions override matching global versions. Requests reject
+redirects and stale identities, share a ten-second deadline including body reads,
+coalesce concurrent loads, bound cache/pending entries, and cool down provider
+failures without deleting authentication. Diagnostics identify the request stage,
+HTTP status when available and deadline expiry without logging credentials or
+provider bodies. Only fixed HTTPS Twitch badge CDN URLs cross the trusted IPC.
+
+The renderer enriches at most 1000 pending containers, with no full-feed scan.
+Slots and containers start hidden, small images load eagerly so hidden elements
+can finish fetching, and only successful loads reveal icons. Unknown definitions
+and load errors retain no visible text. Empty image alt avoids broken-image labels;
+role/aria-label on the visible slot provides an accessible name. Reset/disposal
+invalidates catalog and image callbacks across account/channel changes.
+
+## Verification boundaries
+
+Unit checks cover production-shaped history (including different badge/subscriber
+duration values and null legacy rows), catalog isolation/validation/cooldown,
+trusted IPC, bounded pending DOM references and image load/error/stale callbacks.
+Synthetic Electron replaces only provider/image transports, exercising actual
+image events in both feeds, unknown/failed icons, channel-specific definitions,
+account changes, supplied author colors, unchanged PCG views/bounds and no sends.
+The real-WebSocket guard and temporary-profile ownership remain in force.
+
+Local/hosted checks and real installed observations must be reported separately.
+Synthetic icons do not prove that the real Twitch catalog/CDN is reachable or that
+the deployed history endpoint returns populated badge values. Installed dev.22
+still omits badges until a separately built and installed candidate includes this
+change. Real acceptance must observe newly stored historical messages plus live
+messages; older null rows are expected to have no badges.
+
+Local verification with Node 24.22.3/npm 11.19.1 passed 217/217 behavior tests,
+TypeScript and zero-warning lint. The complete synthetic Electron scenario passed
+at `evidence-tmc-electron-e2e-9h9URu`; owned processes and its profile were removed.
+The screenshot shows successful icons in both feeds, with unknown/failed icons
+absent. Independent defect review found no confirmed actionable defect.
+Initial check failures were a missing test-build entry for the production slot
+builder and browser globals in the new E2E callback; both were corrected without
+weakening assertions. Hosted results and installed/provider acceptance remain
+separate. The package version is unchanged in this source-only increment.

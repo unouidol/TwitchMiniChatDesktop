@@ -27,6 +27,8 @@ import { TmcUserColorService } from '../chat/TmcUserColorService';
 import { registerUserColorIpcHandlers } from './registerUserColorIpcHandlers';
 import { registerChatLinkIpcHandlers } from './registerChatLinkIpcHandlers';
 import { chatAttention } from '../../shared/chat/TmcChatAttention';
+import { TmcBadgeCatalogService } from '../chat/TmcBadgeCatalogService';
+import { registerBadgeIpcHandlers } from './registerBadgeIpcHandlers';
 import { TmcPlayerManager } from '../player/TmcPlayerManager';
 import { registerPlayerIpcHandlers } from './registerPlayerIpcHandlers';
 import { JsonFileStore } from '../storage/JsonFileStore';
@@ -83,6 +85,7 @@ export async function registerIpcHandlers(
   registerEmoteIpcHandlers(emoteCatalog);
   registerUserColorIpcHandlers(new TmcUserColorService(() => accountRegistry.getActiveSession()));
   registerChatLinkIpcHandlers();
+  registerBadgeIpcHandlers(new TmcBadgeCatalogService(() => accountRegistry.getActiveSession()));
   const chatController = registerChatIpcHandlers(runtimeConfig, accountRegistry, (message) => ({
     ...message,
     ...(message.isSelf && message.id.startsWith('local-self-') ? { fragments: emoteCatalog.outgoingFragments(message) } : {}),

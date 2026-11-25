@@ -4,6 +4,7 @@ import { createMessageContent } from './createMessageContent';
 import { appendReplyControls } from './createReplyControls';
 import { createChatAuthor } from './createChatAuthor';
 import { markChatAttention } from './markChatAttention';
+import { createChatBadges } from './createChatBadges';
 
 /**
  * Replaces the temporary chat list with backend history messages.
@@ -53,7 +54,7 @@ function createHistoryMessageElement(message: TmcHistoryMessage): HTMLElement {
 
   const textElement = createMessageContent(message.text, message.fragments);
 
-  messageElement.append(timeElement, authorElement, textElement);
+  messageElement.append(timeElement, createChatBadges(message.badges), authorElement, textElement);
   appendReplyControls(messageElement, message, message.user);
   markChatAttention(messageElement, message.attention);
 

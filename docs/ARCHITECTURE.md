@@ -109,14 +109,17 @@ Account/auth/channel/history resets clear the query/index/highlights and close
 the panel; disposal releases all listeners and row references. Ctrl+F does not
 move focus behind an open login dialog. PCG remains a separate native surface.
 
-Badges are deliberately absent from both history and live chat. The backend
-history contract does not store original badge identities, and the user chose
-consistent removal over live-only badge labels. The catalog service, privileged
-badge IPC, preload capability, renderer enrichment owner and badge CSS are removed;
-there is no hidden catalog request or textual fallback. Existing transport models
-still accept bounded, deduplicated supplied badge metadata for compatibility, but
-renderers never turn it into a role label or image. Author colors, message content,
-emotes and replies retain their existing owners. See [badge display](chat-badge-display.md).
+History and live messages share createChatBadges/TmcChatBadgeController. Only
+original supplied set/version identities are used; badge_info (for example months
+subscribed) is not an icon version. TmcBadgeCatalogService owns bounded temporary
+catalog/cache/pending requests in main, with active account/token checks, a shared
+deadline and fixed Twitch API/CDN validation. The trusted badge IPC exposes only
+public definitions, never credentials. Channel definitions override global versions.
+Slots are hidden until an actual image load succeeds; unknown or failed icons stay
+hidden with no text fallback. Image callbacks reject stale revisions/disposal.
+Reset/dispose drops bounded pending DOM references. Author colors, message content,
+emotes and replies retain their existing owners. Legacy history without metadata
+shows no inferred roles. See [badge display](chat-badge-display.md).
 
 Chat appearance extends the existing TmcSettingsStore/settings.json owner with
 desktop-wide font size (14/16/18/20 px) and comfortable/compact message spacing.

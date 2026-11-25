@@ -31,3 +31,19 @@ test('history with null emotes remains readable plain text', async (context) => 
   const result = await client.loadHistory({ channel: 'fixture-channel', seconds: 60 });
   assert.deepEqual(result.messages[0].fragments, [{ kind: 'text', text: 'hello' }]);
 });
+
+test('production history badge contract preserves original versions and color, ignoring badge-info as icon identity', async (context) => {
+  context.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify([
+    { id: 'new', text: 'hello', user: 'fixture-viewer', ts: 1000,
+      badges: 'moderator/1,subscriber/12', badge_info: 'subscriber/14', color: '#1E90FF' },
+    { id: 'legacy', text: 'older', user: 'fixture-viewer', ts: 900, badges: null, badge_info: null, color: null },
+    { id: 'info-only', text: 'no badge identity', user: 'fixture-viewer', ts: 1100, badge_info: 'subscriber/14' },
+  ])));
+  const client = new TmcBackendClient({ backendBaseUrl: 'https://backend.invalid', desktopClientId: 'synthetic',
+    desktopClientVersion: 'test' }, { getSession: () => ({ desktopSessionToken: 'synthetic-desktop' }) });
+  const { messages } = await client.loadHistory({ channel: 'fixture-channel', seconds: 60 });
+  assert.deepEqual(messages[0].badges, [{ setId: 'moderator', version: '1' }, { setId: 'subscriber', version: '12' }]);
+  assert.equal(messages[0].color, '#1E90FF');
+  assert.equal(messages[1].badges, undefined);
+  assert.equal(messages[2].badges, undefined);
+});
