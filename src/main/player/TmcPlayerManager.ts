@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView, type Session, type WebContents } from 'electron';
+import { BrowserWindow, WebContentsView, type Session, type WebContents, type View } from 'electron';
 import type { TmcTwitchWebSessions } from '../web/TmcTwitchWebSessions';
 import { TmcPlayerDocument } from './TmcPlayerDocument';
 import type { TmcPlayerBounds, TmcPlayerContext, TmcPlayerMode, TmcPlayerOpenRequest, TmcPlayerStatus } from '../../shared/player/TmcPlayerModels';
@@ -17,6 +17,7 @@ export class TmcPlayerManager {
   private ownerContents: WebContents | null = null;
   private viewOwner: BrowserWindow | null = null;
   private detached: BrowserWindow | null = null;
+  private detachedRoot: View | null = null;
   private bounds: TmcPlayerBounds | null = null;
   private partition: Session | null = null;
   private occluded = false;
@@ -152,7 +153,7 @@ export class TmcPlayerManager {
     this.status = { ...this.status, ...partial, sequence: this.status.sequence + 1 };
     this.changed(this.status);
   }
-  private readonly detachedClosed = (): void => { this.detached = null; this.viewOwner = null; this.ownerClosed(); };
+  private readonly detachedClosed = (): void => { this.unwatchDetachedLayout(); this.detached = null; this.viewOwner = null; this.ownerClosed(); };
   private readonly detachedResized = (): void => this.applyBounds();
 
   private move(mode: TmcPlayerMode): void {
@@ -168,6 +169,8 @@ export class TmcPlayerManager {
         this.detached.webContents.on('will-navigate', (event) => event.preventDefault());
         this.detached.on('closed', this.detachedClosed);
         this.detached.on('resize', this.detachedResized);
+        this.detachedRoot = this.detached.contentView;
+        this.detachedRoot.on('bounds-changed', this.detachedResized);
       }
       this.detached.setTitle(`TMC live · #${this.status.channel}`);
       this.viewOwner = this.detached;
@@ -185,7 +188,8 @@ export class TmcPlayerManager {
     if (!this.view || !this.contents || this.contents.isDestroyed()) return;
     const detached = this.viewOwner === this.detached && this.detached && !this.detached.isDestroyed();
     if (detached) {
-      const [width, height] = this.detached.getContentSize();
+      if (!this.detachedRoot) throw new Error('Player window layout unavailable.');
+      const { width, height } = this.detachedRoot.getBounds();
       this.restoreAudio();
       this.view.setBounds({ x: 0, y: 0, width, height });
     } else {
@@ -202,10 +206,15 @@ export class TmcPlayerManager {
   private destroyDetached(): void {
     const detached = this.detached;
     this.detached = null;
+    this.unwatchDetachedLayout();
     if (!detached || detached.isDestroyed()) return;
     detached.removeListener('closed', this.detachedClosed);
     detached.removeListener('resize', this.detachedResized);
     detached.destroy();
+  }
+  private unwatchDetachedLayout(): void {
+    this.detachedRoot?.removeListener('bounds-changed', this.detachedResized);
+    this.detachedRoot = null;
   }
   private async release(): Promise<void> {
     if (this.view) {

@@ -84,3 +84,27 @@ the separate player initially to approximately 903x607 outer pixels at 96 DPI.
 Dev.25 used 900x600, but the user found that too small. After an explicit final
 resize confirmation, the window measured 1010x698 outer pixels (994x659 client
 area) at 96 DPI. Dev.26 uses those exact outer dimensions as its initial size.
+
+The user accepted the dev.26 size but reported clipped Twitch bottom controls.
+An isolated native probe reproduced the app defect without Twitch: after native
+menu layout, the content root was 994x633 while the video view/iframe retained
+994x659. The bottom 26 pixels therefore lay outside the parent. The script-free
+wrapper's iframe itself fit its own viewport; increasing the outer window was
+not the correction for this mismatch.
+
+Dev.27 sizes detached video from its captured native content View and observes
+that View's `bounds-changed` event, covering delayed menu/layout changes as well
+as ordinary resizing. The listener is removed during return-inline/native-close
+cleanup. A repeated isolated probe measured root, video viewport and iframe all
+994x633 at the same 1010x698 outer size, and 884x535 after a 900x600 resize.
+Before/after evidence is `player-layout-probe-h9gqaO` / `player-layout-probe-y1g44R`;
+only the frame transport was replaced with a guarded loopback fixture, with no
+real account or Twitch contact. Owned temporary profiles were removed. Real
+installed Twitch control visibility still requires a separate user observation.
+
+The clipping correction passed 221 local behavior tests, typecheck, zero-warning
+lint, independent defect review and the complete isolated Electron scenario
+(`evidence-tmc-electron-e2e-eDAhOn`), including stable native parent/video equality
+and profile cleanup. The familiar WebDriver disconnect during `window.close()`
+was emitted rather than filtered; process-exit, restart and cleanup assertions
+passed. Hosted and protected-package checks for the final commit are separate.

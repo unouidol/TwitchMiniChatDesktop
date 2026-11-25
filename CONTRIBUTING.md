@@ -65,6 +65,12 @@ The full synthetic Electron process has a 180-second watchdog to cover the
 expanded auth/chat/appearance scenario on Windows. Individual production
 request deadlines, assertion timeouts and ownership/network guards are unchanged.
 
+Detached-player layout coverage simulates content-only changes after menu layout
+without an outer resize and verifies observer cleanup on inline return/native
+close. The native Electron scenario requires stable equality between video and
+parent content-View bounds on both reparenting and fresh separate-window opening.
+These observations inspect app-owned native geometry, never remote Twitch DOM.
+
 Appearance coverage exercises legacy defaults without read-side writes,
 serialized concurrent channel/appearance updates, fresh-store persistence,
 invalid payloads, failed writes and corrupt-file preservation. Synthetic Electron
