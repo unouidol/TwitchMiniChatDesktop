@@ -80,5 +80,7 @@ reported correct player authentication on their own channel, and observed no
 advertising during that test. This passes that scoped playback observation, not
 a guarantee of future ad-free playback. Real A/B player web-identity isolation
 and persistence after a video restart remain separate checks. The user resized
-the separate player to approximately 903x607 outer pixels at 96 DPI; the next
-local candidate uses a 900x600 initial window instead of 720x450.
+the separate player initially to approximately 903x607 outer pixels at 96 DPI.
+Dev.25 used 900x600, but the user found that too small. After an explicit final
+resize confirmation, the window measured 1010x698 outer pixels (994x659 client
+area) at 96 DPI. Dev.26 uses those exact outer dimensions as its initial size.
