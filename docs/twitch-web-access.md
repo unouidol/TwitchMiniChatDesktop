@@ -74,3 +74,11 @@ Review also added explicit hiding/bounds gates for a rejected new identity and a
 regression proving that the old view cannot be revealed by later bounds updates.
 Packaging, hosted exact-head results and installed manual observations are recorded
 separately; local passes do not establish those results.
+
+On 2026-11-25, the user tested installed dev.24 with A selected and PCG connected,
+reported correct player authentication on their own channel, and observed no
+advertising during that test. This passes that scoped playback observation, not
+a guarantee of future ad-free playback. Real A/B player web-identity isolation
+and persistence after a video restart remain separate checks. The user resized
+the separate player to approximately 903x607 outer pixels at 96 DPI; the next
+local candidate uses a 900x600 initial window instead of 720x450.

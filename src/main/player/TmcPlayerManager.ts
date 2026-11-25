@@ -161,7 +161,7 @@ export class TmcPlayerManager {
     this.viewOwner = null;
     if (mode === 'detached') {
       if (!this.detached) {
-        this.detached = new BrowserWindow({ width: 720, height: 450, minWidth: 480, minHeight: 400, show: false,
+        this.detached = new BrowserWindow({ width: 900, height: 600, minWidth: 480, minHeight: 400, show: false,
           title: `TMC live · #${this.status.channel}`, backgroundColor: '#080914', webPreferences: {
             session: this.partition, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true } });
         this.detached.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

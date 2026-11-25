@@ -44,6 +44,8 @@ one playback WebContentsView and at most one separate video window. It embeds
 only with at least 400x300 video pixels and 180px remaining feed space. Otherwise
 it opens/moves to a separate window without stealing focus; returning inline is
 explicit. Moving reparents the same WebContents rather than reloading playback.
+The separate player window opens at 900x600 logical pixels, following
+the user's approximately 903x607 window observed on Windows at 96 DPI.
 Closing either control or the separate window destroys media and closes its
 source; account changes replace the playback context, while channel
 changes navigate the owned view. Refreshing history never restarts the same video.
