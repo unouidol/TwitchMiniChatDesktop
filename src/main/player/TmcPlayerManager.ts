@@ -1,8 +1,9 @@
-import { BrowserWindow, WebContentsView, session, type Session, type WebContents } from 'electron';
+import { BrowserWindow, WebContentsView, type Session, type WebContents } from 'electron';
+import type { TmcTwitchWebSessions } from '../web/TmcTwitchWebSessions';
 import { TmcPlayerDocument } from './TmcPlayerDocument';
 import type { TmcPlayerBounds, TmcPlayerContext, TmcPlayerMode, TmcPlayerOpenRequest, TmcPlayerStatus } from '../../shared/player/TmcPlayerModels';
 
-/** A single anonymous playback surface; never shares chat/PCG credentials or sessions. */
+/** One playback surface using the selected account's existing PCG/Twitch web session. */
 export class TmcPlayerManager {
   private status: TmcPlayerStatus = { sequence: 0, state: 'closed', profileId: null, channel: null, mode: 'embedded', message: null };
   private revision = 0;
@@ -27,7 +28,8 @@ export class TmcPlayerManager {
   };
   private readonly ownerDestroyed = (): void => { this.unwatchOwner(); this.ownerClosed(); };
 
-  constructor(private readonly activeProfile: () => string | null, private readonly changed: (status: TmcPlayerStatus) => void) {}
+  constructor(private readonly activeProfile: () => string | null, private readonly changed: (status: TmcPlayerStatus) => void,
+    private readonly webSessions: TmcTwitchWebSessions) {}
   getStatus(): TmcPlayerStatus { return this.status; }
   get source(): { origin: string; pathname: string } | null { return this.document?.source || null; }
   occlude(hidden: boolean, owner: BrowserWindow): void {
@@ -54,9 +56,7 @@ export class TmcPlayerManager {
         const url = await this.document.url(context.channel);
         this.assertCurrent(context, revision);
         if (!this.partition) {
-          this.partition = session.fromPartition('tmc-anonymous-live-player');
-          this.partition.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-          this.partition.setPermissionCheckHandler(() => false);
+          this.partition = this.webSessions.get(context.profileId);
         }
         if (!this.view) {
           this.view = new WebContentsView({ webPreferences: { session: this.partition, sandbox: true,
@@ -231,9 +231,7 @@ export class TmcPlayerManager {
     const document = this.document;
     this.document = null;
     await document?.close();
-    if (this.partition) {
-      await this.partition.clearStorageData(); await this.partition.clearCache();
-      await this.partition.clearAuthCache(); await this.partition.closeAllConnections();
-    }
+    // Closing media must not clear PCG's login/storage/cache or connections.
+    this.partition = null;
   }
 }

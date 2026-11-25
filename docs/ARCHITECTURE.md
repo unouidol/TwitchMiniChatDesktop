@@ -45,7 +45,7 @@ only with at least 400x300 video pixels and 180px remaining feed space. Otherwis
 it opens/moves to a separate window without stealing focus; returning inline is
 explicit. Moving reparents the same WebContents rather than reloading playback.
 Closing either control or the separate window destroys media and closes its
-source; account changes replace the anonymous playback context, while channel
+source; account changes replace the playback context, while channel
 changes navigate the owned view. Refreshing history never restarts the same video.
 
 TmcPlayerDocument serves a script-free document from an ephemeral IPv4 loopback
@@ -55,10 +55,14 @@ to the official Twitch iframe. This provides an actual localhost parent even
 when the packaged shell uses file URLs; no frame-ancestor headers are stripped.
 The remote video surface has no preload or Node bridge; sandboxing, context
 isolation and web security stay enabled. Popups, top-level navigation and session
-permissions are denied. Playback uses one bounded, nonpersistent anonymous
-partition, cleared on close/account replacement, separate from chat and PCG
-authentication. If Twitch requires sign-in, Open on Twitch uses the existing
-validated browser-link operation; player login is not inferred from chat login.
+permissions are denied. PCG and video use the same per-account persistent web
+session selected by TmcTwitchWebSessions. OAuth/chat credentials remain separate:
+there is no cookie/token copying or automatic web identity inference. Closing or
+replacing video closes only media, windows and the local source, never shared
+storage, cache, HTTP authentication or connections needed by PCG. Existing safe
+PCG partition names are preserved. Noncanonical IDs get a disjoint hashed name;
+ambiguous legacy files are retained, not guessed or migrated. Registered IDs that
+alias case-insensitively fail closed. See [shared Twitch web access](twitch-web-access.md).
 
 Typed trusted-main-frame IPC validates context, dimensions and window bounds.
 Queued operations carry request revisions and initiating account/channel; a
@@ -81,6 +85,8 @@ path. Closing the application while video is active is covered separately from
 closing the player controls.
 "Ready" means the local player document loaded, not proof a channel is live;
 Twitch owns offline, ads, quality, volume and playback states in the iframe.
+Sharing native storage enables web-session use; cookie presence and synthetic
+playback are not proof that Twitch recognizes a subscription or removes ads.
 
 The shell follows the actual client viewport inside a 960x650 outer-window
 minimum, accounting for Windows frame borders; the document itself does not
@@ -345,7 +351,7 @@ Before opening the dialog, the renderer hides the native embedded PCG surface
 through the existing bridge. Bounds synchronization keeps it hidden while the
 dialog is opening/open, including on resize and activation. Closing schedules
 normal bounds restoration. Hiding does not unload or destroy PCG authentication.
-Detached PCG windows remain separate. PCG's Twitch sign-in is a separate flow.
+Detached PCG windows remain separate. PCG/video web sign-in remains separate from chat OAuth.
 
 The compact header uses one account selector and an accessible status region;
 removal is inside Account options and still requires the existing confirmation.

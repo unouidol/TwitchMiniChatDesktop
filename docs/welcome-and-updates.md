@@ -3,7 +3,7 @@
 The local welcome page opens once on first use, after an installed version
 increase, or once for a newly cached newer stable release at a subsequent start.
 It can always be reopened from the header's **••• → About TMC** menu. It includes
-desktop sign-in/channel guidance, the independent PCG login, the project website,
+desktop sign-in/channel guidance, the shared PCG/video web login, the project website,
 Discord (`#tmc-ticket`) and voluntary Ko-fi support. Public community links and
 the welcome structure follow the Android project's `welcome` package and
 `ProjectLinks.kt`; Android application behavior is not imported.

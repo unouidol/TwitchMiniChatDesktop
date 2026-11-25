@@ -257,7 +257,7 @@ try {
   assert.deepEqual(fixture.requests.filter((entry) => entry.path === '/finalize').map((entry) => entry.accepted), [false, false, true]);
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, 'browser-attempts.json'), 'utf8')), { browserAttempts: 2 });
   await exerciseLayout(browser, fixture, evidence, readNativeViews);
-  await exercisePcgMenu(browser, evidence, readNativeViews, async (state) => {
+  const setBrowserSession = async (state) => {
     const destination = path.join(root, 'pcg-cookie-command');
     await fs.writeFile(`${destination}.tmp`, state);
     await fs.rename(`${destination}.tmp`, destination);
@@ -265,7 +265,8 @@ try {
       try { return (await fs.readFile(path.join(root, 'pcg-cookie-ack'), 'utf8')) === state; }
       catch (error) { if (error.code !== 'ENOENT') throw error; return false; }
     }, 'synthetic browser-session fixture change');
-  });
+  };
+  await exercisePcgMenu(browser, evidence, readNativeViews, setBrowserSession);
   await exerciseEmotes(browser, fixture, evidence, readNativeViews, async () => {
     try { return JSON.parse(await fs.readFile(path.join(root, 'chat-link-attempts.json'), 'utf8')).attempts; }
     catch (error) { if (error.code !== 'ENOENT') throw error; return []; }
@@ -277,6 +278,7 @@ try {
   await exerciseMentions(browser, fixture, evidence, readNativeViews);
   await exerciseBadgeFreeChat(browser, fixture, evidence, readNativeViews);
   await exerciseSearch(browser, fixture, evidence, readNativeViews);
+  await setBrowserSession('present-A');
   await exercisePlayer(browser, fixture, evidence, readNativeViews, readPlayback, resizeOwnedWindow, closeOwnedPlayerWindow);
   const projectLinks = (await fs.readFile(path.join(root, 'project-link-attempts.txt'), 'utf8')).trim().split('\n');
   assert.deepEqual(projectLinks, ['https://github.com/unouidol/TwitchMiniChatDesktop/releases/download/v99.0.0/TMC-desktop-Setup.exe']);

@@ -5,8 +5,17 @@ let id = 0;
 let held = false;
 const views = [];
 const partitions = new Set();
-const storage = { clears: 0, setPermissionRequestHandler(callback) { this.requestPermission = callback; }, setPermissionCheckHandler(callback) { this.checkPermission = callback; },
-  async clearStorageData() { this.clears++; }, async clearCache() {}, async clearAuthCache() {}, async closeAllConnections() {} };
+const makeStorage = () => ({ requestHandlers: 0, checkHandlers: 0,
+  setPermissionRequestHandler(callback) { this.requestHandlers++; this.requestPermission = callback; },
+  setPermissionCheckHandler(callback) { this.checkHandlers++; this.checkPermission = callback; },
+  get cookies() { assert.fail('Player must not read cookie values'); },
+  async clearStorageData() { assert.fail('Shared login must not be cleared'); },
+  async clearCache() { assert.fail('PCG cache must not be cleared'); },
+  async clearAuthCache() { assert.fail('Shared HTTP authentication must not be cleared'); },
+  async closeAllConnections() { assert.fail('PCG connections must not be closed'); },
+});
+const storage = makeStorage();
+const sessions = new Map([['persist:tmc-pcg-A', storage]]);
 class Contents extends EventEmitter {
   id = ++id; destroyed = false; muted = false;
   setWindowOpenHandler(handler) { this.popup = handler; }
@@ -31,15 +40,20 @@ class Window extends EventEmitter {
   destroy() { this.destroyed = true; this.emit('closed'); }
   setTitle() {} showInactive() {}
 }
-mock.module('electron', { cache: true, exports: { BrowserWindow: Window, WebContentsView: View, session: { fromPartition: (name) => { partitions.add(name); return storage; } } } });
+mock.module('electron', { cache: true, exports: { BrowserWindow: Window, WebContentsView: View, session: { fromPartition: (name) => {
+  partitions.add(name); if (!sessions.has(name)) sessions.set(name, makeStorage()); return sessions.get(name);
+} } } });
 const { TmcPlayerManager } = require('../.test-build/main/player/TmcPlayerManager.js');
+const { TmcTwitchWebSessions } = require('../.test-build/main/web/TmcTwitchWebSessions.js');
+const webSessions = new TmcTwitchWebSessions(() => ['A', 'B']);
+const createPlayer = (active, changed) => new TmcPlayerManager(active, changed, webSessions);
 const a = { profileId: 'A', channel: 'channel' };
 const rectangle = { x: 10, y: 10, width: 500, height: 300 };
 const request = (context) => ({ ...context, mode: 'embedded', bounds: rectangle });
 
-test('moving playback retains its view while close destroys media, closes the actual loopback source and clears only the dedicated memory session', async (context) => {
+test('moving retains its view; closing destroys media/source without clearing the shared PCG session', async (context) => {
   const owner = new Window();
-  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+  const manager = createPlayer(() => 'A', () => {}); context.after(() => manager.close());
   assert.equal(manager.source, null);
   await manager.show(request(a), owner);
   const view = views.at(-1); const source = manager.source;
@@ -55,11 +69,13 @@ test('moving playback retains its view while close destroys media, closes the ac
   await manager.close(a);
   assert.equal(view.webContents.isDestroyed(), true); assert.equal(manager.source, null); assert.equal(owner.children.size, 0);
   await assert.rejects(fetch(`${source.origin}${source.pathname}?channel=channel`, { signal: AbortSignal.timeout(1000) }), /fetch failed/);
-  assert.deepEqual([...partitions], ['tmc-anonymous-live-player']); assert.ok(storage.clears > 0);
+  assert.deepEqual([...partitions], ['persist:tmc-pcg-A']);
+  assert.equal(view.preferences.session, webSessions.get('A'));
+  assert.equal(storage.requestHandlers, 1); assert.equal(storage.checkHandlers, 1);
 });
 
 test('modal occlusion applied before creation stays effective through loading and can restore the same view', async (context) => {
-  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+  const manager = createPlayer(() => 'A', () => {}); context.after(() => manager.close());
   const owner = new Window(); manager.occlude(true, owner);
   await manager.show(request(a), owner); const view = views.at(-1);
   assert.equal(view.bounds.width, 0); assert.equal(view.webContents.isAudioMuted(), true);
@@ -67,8 +83,25 @@ test('modal occlusion applied before creation stays effective through loading an
   assert.equal(view.bounds.width, rectangle.width); assert.equal(view.webContents.isAudioMuted(), false);
 });
 
+test('account replacement uses distinct web storage and reopening A retains its original session', async (context) => {
+  let active = 'A';
+  const manager = createPlayer(() => active, () => {}); context.after(() => manager.close());
+  const owner = new Window();
+  await manager.show(request(a), owner);
+  const first = views.at(-1), storedA = first.preferences.session;
+  assert.equal(storedA, webSessions.get('A'));
+  active = 'B'; await manager.show(request({ profileId: 'B', channel: 'other' }), owner);
+  assert.equal(first.webContents.isDestroyed(), true);
+  assert.equal(views.at(-1).preferences.session, webSessions.get('B'));
+  assert.notEqual(views.at(-1).preferences.session, storedA);
+  await manager.close();
+  active = 'A'; await manager.show(request(a), owner);
+  assert.equal(views.at(-1).preferences.session, storedA);
+  assert.equal(storedA.requestHandlers, 1, 'Reopening media never overwrites shared permission handlers');
+});
+
 test('latest pending context can be cancelled before creation and stale close cannot cancel a newer account', async (context) => {
-  let active = 'A'; const manager = new TmcPlayerManager(() => active, () => {}); context.after(() => manager.close());
+  let active = 'A'; const manager = createPlayer(() => active, () => {}); context.after(() => manager.close());
   const owner = new Window(); await manager.show(request(a), owner); const old = views.at(-1);
   const b = { profileId: 'B', channel: 'other' }; active = 'B';
   const opening = manager.show(request(b), owner);
@@ -77,11 +110,11 @@ test('latest pending context can be cancelled before creation and stale close ca
   await assert.rejects(opening, /superseded/); await closing;
   assert.equal(old.webContents.isDestroyed(), true); assert.equal(manager.source, null); assert.equal(manager.getStatus().state, 'closed');
   await manager.show(request(b), owner);
-  assert.deepEqual([...partitions], ['tmc-anonymous-live-player']);
+  assert.deepEqual([...partitions], ['persist:tmc-pcg-A', 'persist:tmc-pcg-B']);
 });
 
 test('owner document reload closes media; its window-owned watcher ignores frame and same-document navigation', async (context) => {
-  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+  const manager = createPlayer(() => 'A', () => {}); context.after(() => manager.close());
   const owner = new Window(); await manager.show(request(a), owner);
   const view = views.at(-1), source = manager.source;
   owner.webContents.emit('did-start-navigation', { isMainFrame: false, isSameDocument: false });
@@ -99,14 +132,14 @@ test('owner document reload closes media; its window-owned watcher ignores frame
   assert.equal(owner.webContents.listenerCount('did-start-navigation'), 0);
 });
 
-test('reload rejects an open queued behind previous session cleanup before it creates media', async (context) => {
-  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+test('reload rejects an open queued behind previous media cleanup before it creates media', async (context) => {
+  const manager = createPlayer(() => 'A', () => {}); context.after(() => manager.close());
   const owner = new Window(); await manager.show(request(a), owner);
   let release, entered;
   const blocked = new Promise((resolve) => { entered = resolve; });
-  context.mock.method(storage, 'clearStorageData', async () => {
-    entered(); await new Promise((resolve) => { release = resolve; });
-  });
+  const contents = views.at(-1).webContents;
+  const originalClose = contents.close.bind(contents);
+  context.mock.method(contents, 'close', () => { release = originalClose; entered(); });
   const closing = manager.close(); await blocked;
   const count = views.length;
   const opening = manager.show(request(a), owner);
@@ -119,7 +152,7 @@ test('reload rejects an open queued behind previous session cleanup before it cr
 });
 
 test('teardown uses its captured WebContents even when native view destruction removes the getter', async (context) => {
-  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+  const manager = createPlayer(() => 'A', () => {}); context.after(() => manager.close());
   const owner = new Window(); await manager.show(request(a), owner);
   const view = views.at(-1), contents = view.webContents;
   delete view.webContents;
@@ -133,7 +166,7 @@ test('an account change during actual source creation rejects stale work and lea
   const servers = [];
   context.mock.method(Server.prototype, 'listen', function (...args) { servers.push(this); return Reflect.apply(realListen, this, args); });
   let reads = 0;
-  const manager = new TmcPlayerManager(() => ++reads >= 3 ? 'B' : 'A', () => {}); context.after(() => manager.close());
+  const manager = createPlayer(() => ++reads >= 3 ? 'B' : 'A', () => {}); context.after(() => manager.close());
   const pending = manager.show(request(a), new Window());
   await assert.rejects(pending, /superseded/);
   assert.equal(manager.source, null);
@@ -147,7 +180,7 @@ test('a bounded load failure destroys the view/server and preserves a useful cau
     if (delay === 15000) { deadline = callback; return 0; }
     return realTimeout(callback, delay);
   });
-  const manager = new TmcPlayerManager(() => 'A', () => {}); context.after(() => manager.close());
+  const manager = createPlayer(() => 'A', () => {}); context.after(() => manager.close());
   const pending = manager.show(request(a), new Window());
   const rejected = assert.rejects(pending, (error) => error.message === 'Could not load the player.' && error.cause.message === 'Player load timed out.');
   while (!deadline) await new Promise(setImmediate);

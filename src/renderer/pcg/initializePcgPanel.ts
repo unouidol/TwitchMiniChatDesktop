@@ -55,7 +55,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     }
     if (signInDescription) signInDescription.textContent = status.twitchAuth === 'unknown'
       ? 'We could not confirm a Twitch session for the game. You can sign in here; chat login is separate.'
-      : 'The game needs its own Twitch sign-in, separate from chat.';
+      : 'PCG and video share this Twitch sign-in, separate from chat. Use the account selected in chat.';
     if (quickLoginButton) quickLoginButton.disabled = status.state !== 'active' || loginPending;
     host?.classList.toggle('tmc-pcg-host-detached', status.displayMode === 'detached');
 

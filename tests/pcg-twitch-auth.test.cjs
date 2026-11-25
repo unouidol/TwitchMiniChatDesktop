@@ -22,7 +22,7 @@ const sessionFor = (partition) => {
       cookies.calls++;
       return cookies.read();
     };
-    sessions.set(partition, { cookies });
+    sessions.set(partition, { cookies, setPermissionRequestHandler() {}, setPermissionCheckHandler() {} });
   }
   return sessions.get(partition);
 };
@@ -38,17 +38,19 @@ class FakeView {
     this.webContents = new FakeContents(options.webPreferences.partition);
     views.push(this);
   }
-  setBounds() {}
+  setBounds(value) { this.bounds = value; }
 }
 mock.module('electron', { cache: true, exports: {
+  session: { fromPartition: sessionFor },
   WebContentsView: FakeView,
   BrowserWindow: class {},
   shell: { openExternal: async () => { throw new Error('Unexpected external browser'); } },
 } });
 const { TmcPcgSessionManager } = require('../.test-build/main/pcg/TmcPcgSessionManager.js');
+const { TmcTwitchWebSessions } = require('../.test-build/main/web/TmcTwitchWebSessions.js');
 const makeManager = () => new TmcPcgSessionManager({
   pcgExtensionUrlTemplate: 'https://fixture.ext-twitch.tv/{channel}',
-}, () => {});
+}, () => {}, new TmcTwitchWebSessions(() => ['A', 'B']));
 const cookieEvidence = () => [{ name: 'auth-token', domain: '.twitch.tv',
   get value() { throw new Error('Cookie values must never be inspected'); },
 }];
@@ -171,6 +173,30 @@ test('late panel activation cannot attach B browser-session evidence to A', asyn
     assert.equal(manager.getStatus().profileId, 'B');
     assert.equal(manager.getStatus().twitchAuth, 'session-present');
   } finally { FakeContents.prototype.loadURL = original; }
+});
+
+test('a rejected web identity hides the retained previous view even after renderer bounds synchronization', async () => {
+  const children = new Set();
+  const owner = { isDestroyed: () => false, contentView: {
+    addChildView: (view) => children.add(view), removeChildView: (view) => children.delete(view),
+  } };
+  const manager = makeManager();
+  const bounds = { x: 0, y: 0, width: 300, height: 400 };
+  await manager.activate('A', 'channel', owner);
+  await flush();
+  manager.setBounds(bounds, owner);
+  const original = views[0];
+  assert.equal(original.bounds.width, 300);
+  const rejected = await manager.activate('unregistered', 'channel', owner);
+  assert.equal(rejected.state, 'error');
+  assert.equal(original.bounds.width, 0);
+  manager.setBounds(bounds, owner);
+  assert.equal(original.bounds.width, 0, 'A bounds update cannot reveal the previous identity');
+  assert.equal(original.webContents.isDestroyed(), false);
+  assert.equal(views.length, 1, 'Rejection never creates or reassigns a browser session');
+  await manager.activate('A', 'channel', owner); await flush();
+  assert.equal(views[0], original); assert.equal(original.bounds.width, 300);
+  assert.equal(manager.getStatus().twitchAuth, 'signed-out');
 });
 
 test('duplicate pending and ready PCG activation navigates once and retains its view', async (context) => {
