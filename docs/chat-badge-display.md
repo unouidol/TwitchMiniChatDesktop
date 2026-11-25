@@ -12,6 +12,17 @@ text, timestamp, emotes and message ID; it does not preserve original badge role
 Current live roles cannot safely be applied retrospectively to historical messages.
 No server change or deployment is included in this desktop correction.
 
+Backend update, 2026-11-25: the production history endpoint now also returns
+`badges` and `badge_info` as raw IRC tag strings (for example
+`moderator/1,subscriber/12` and `subscriber/14`) and `color` as the raw name
+color (for example `#1E90FF`), each `null` when Twitch sent none. Only messages
+stored after that backend restart carry them; older rows return `null`. After the
+restart, new rows in the production database were checked and carried badges
+and colors. The desktop's existing transport parser already reads `badges` and
+`color` from history, so history author colors now come from Twitch. Badge
+display stays removed in this candidate; showing badges again needs its own
+change and the live icon failure above still has no established cause.
+
 The old renderer intentionally retained text when badge definitions or images were
 unavailable. The exact provider failure behind the user's missing live icons was
 not established; this change implements the requested removal rather than claiming

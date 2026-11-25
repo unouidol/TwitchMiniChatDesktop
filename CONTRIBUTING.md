@@ -42,9 +42,11 @@ and verifies live results, account/channel reset, native PCG bounds and no sends
 A held-history response with an actual live IRC arrival proves history commit
 removes temporary/detached search results before replacing the feed.
 
-Badges are not displayed in either history or live chat. The backend history
-contract does not include original badge identities; the user chose consistent
-removal over live-only text fallbacks. The bounded transport metadata parser
+Badges are not displayed in either history or live chat. When this was decided
+the backend history contract did not include original badge identities; the user
+chose consistent removal over live-only text fallbacks. Since 2026-11-25 the
+backend returns raw `badges`, `badge_info` and `color` for newly stored messages;
+badge display remains removed until a separate change. The bounded transport metadata parser
 remains covered, but the unused catalog service/bridge/rendering owner is removed.
 Synthetic Electron supplies history and IRC badge metadata and verifies no badge
 labels/images or catalog bridge, preserved message/author colors, account changes,

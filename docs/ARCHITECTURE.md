@@ -103,9 +103,11 @@ Account/auth/channel/history resets clear the query/index/highlights and close
 the panel; disposal releases all listeners and row references. Ctrl+F does not
 move focus behind an open login dialog. PCG remains a separate native surface.
 
-Badges are deliberately absent from both history and live chat. The backend
-history contract does not store original badge identities, and the user chose
-consistent removal over live-only badge labels. The catalog service, privileged
+Badges are deliberately absent from both history and live chat. When this was
+decided the backend history contract did not store original badge identities,
+and the user chose consistent removal over live-only badge labels. Since
+2026-11-25 the backend returns raw `badges`, `badge_info` and `color` for newly
+stored messages; badge display remains removed until a separate change. The catalog service, privileged
 badge IPC, preload capability, renderer enrichment owner and badge CSS are removed;
 there is no hidden catalog request or textual fallback. Existing transport models
 still accept bounded, deduplicated supplied badge metadata for compatibility, but
