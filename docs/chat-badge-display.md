@@ -84,3 +84,13 @@ separate. The user authorized a local dev.23 package after the source-only incre
 Hosted run 45588946056 passed both Windows jobs at source commit
 `0c0a54382942ff7cd2c18492de717cd374aea859`. The later version-stamped candidate
 requires its own exact-head checks and protected-artifact verification.
+
+Installed dev.23 acceptance subsequently failed: the user saw no badges in either
+feed. A manual launch of the verified installed artifact, with only sanitized
+badge-warning fields retained, observed global-definition rejection after HTTP
+200 and no deadline expiry (`badge-live-diagnostic-4MRrP2`). This establishes a
+catalog parsing failure, not its exact invalid field. More precise validation
+reason codes are allowlisted before logging; provider bodies, token values and
+untrusted exception text are never emitted. This diagnostic increment passes
+218 behavior tests, typecheck and zero-warning lint. The real field-level result
+and corrective change remain pending; it does not claim badge acceptance passed.

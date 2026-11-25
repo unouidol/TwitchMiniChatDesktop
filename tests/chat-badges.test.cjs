@@ -83,3 +83,21 @@ test('badge deadline aborts body consumption and clears its timer without deleti
   assert.equal(cleared, true);
   assert.equal(session.accessToken, 'synthetic-only');
 });
+
+test('badge diagnostics identify invalid metadata fields without logging provider bodies or credentials', async (context) => {
+  const warnings = [];
+  context.mock.method(console, 'warn', (...values) => warnings.push(values));
+  for (const [change, reason] of [
+    [(entry) => { entry.title = ''; }, 'Empty badge title.'],
+    [(entry) => { entry.image_url_2x = 'https://private.invalid/sensitive-provider-field'; }, 'Invalid badge image URL.'],
+    [(entry) => { entry.id = 'invalid/sensitive-provider-field'; }, 'Invalid badge metadata identity.'],
+  ]) {
+    global.fetch = provider(() => session, [], (value, url) => {
+      if (url.endsWith('/global')) change(value.data[0].versions[0]);
+      return value;
+    });
+    assert.equal((await new TmcBadgeCatalogService(() => session).getCatalog(request)).status, 'unavailable');
+    assert.deepEqual(warnings.at(-1)[1], { stage: 'global definitions', responseStatus: 200, deadlineExceeded: false, reason });
+  }
+  assert.doesNotMatch(JSON.stringify(warnings), /synthetic-only|sensitive-provider-field/);
+});

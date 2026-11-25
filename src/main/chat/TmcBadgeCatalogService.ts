@@ -3,6 +3,10 @@ import type { TmcAuthSession } from '../auth/TmcAuthSessionStore';
 import { isTwitchBadgeImage, readChatBadges, type TmcBadgeCatalog, type TmcBadgeImage, type TmcBadgeRequest } from '../../shared/chat/TmcChatBadges';
 
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
+const safeFailureReasons = new Set(['Badge provider unavailable.', 'Invalid badge response.', 'Invalid badge identity.',
+  'Invalid badge channel.', 'Invalid badge sets.', 'Invalid badge versions.', 'Invalid badge version.',
+  'Invalid badge metadata identity.', 'Invalid badge title.', 'Empty badge title.', 'Oversized badge title.',
+  'Invalid badge image URL.', 'Duplicate or excessive badges.', 'Badge catalog exceeds bounds.']);
 
 /** Owns public badge definitions; credentials and provider decisions stay in main. */
 export class TmcBadgeCatalogService {
@@ -69,9 +73,10 @@ export class TmcBadgeCatalogService {
       for (const badge of channel) merged.set(`${badge.setId}/${badge.version}`, badge);
       if (merged.size > 10000) throw new Error('Badge catalog exceeds bounds.');
       return { ...request, badges: [...merged.values()], status: 'ready' };
-    } catch {
+    } catch (error) {
       this.assertCurrent(session);
-      console.warn('[TMC Chat] Badge icons unavailable; no text fallback.', { stage, responseStatus, deadlineExceeded: controller.signal.aborted });
+      const reason = error instanceof Error && safeFailureReasons.has(error.message) ? error.message : 'Request failed.';
+      console.warn('[TMC Chat] Badge icons unavailable; no text fallback.', { stage, responseStatus, deadlineExceeded: controller.signal.aborted, reason });
       return { ...request, badges: [], status: 'unavailable' };
     } finally { clearTimeout(timer); }
   }
@@ -86,8 +91,11 @@ function parseCatalog(value: Record<string, unknown>): TmcBadgeImage[] {
     for (const version of set.versions) {
       if (!object(version)) throw new Error('Invalid badge version.');
       const [identity] = readChatBadges([{ setId: set.set_id, version: version.id }]);
-      if (!identity || typeof version.title !== 'string' || !version.title.trim() || version.title.length > 200 ||
-          !isTwitchBadgeImage(version.image_url_2x)) throw new Error('Invalid badge metadata.');
+      if (!identity) throw new Error('Invalid badge metadata identity.');
+      if (typeof version.title !== 'string') throw new Error('Invalid badge title.');
+      if (!version.title.trim()) throw new Error('Empty badge title.');
+      if (version.title.length > 200) throw new Error('Oversized badge title.');
+      if (!isTwitchBadgeImage(version.image_url_2x)) throw new Error('Invalid badge image URL.');
       const key = `${identity.setId}/${identity.version}`;
       if (seen.has(key) || result.length >= 10000) throw new Error('Duplicate or excessive badges.');
       seen.add(key);
