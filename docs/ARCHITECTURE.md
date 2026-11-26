@@ -39,6 +39,12 @@ first-run launches retain regular startup. The protected fixture substitutes onl
 the updater boundary; real shortcut creation has a separate silent-install check.
 
 Live video is opt-in through Show live for the actually opened channel. The
+primary control sits in the chat heading beside the channel, with a decorative
+Play icon and Show live label when closed. Loading/open/detached playback uses a
+Stop icon and Close live label; native close restores Play. Text and aria-expanded
+are synchronized through the existing renderer owner without replacing SVG nodes.
+Secondary chat tools occupy their own row, with the heading kept within narrow
+chat columns. Icons require no remote asset or additional dependency. The
 renderer measures a resizable host above chat; main owns one TmcPlayerManager,
 one playback WebContentsView and at most one separate video window. It embeds
 only with at least 400x300 video pixels and 180px remaining feed space. Otherwise

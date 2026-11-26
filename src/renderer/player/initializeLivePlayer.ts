@@ -11,6 +11,9 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
   const panel = document.querySelector<HTMLElement>('[data-tmc-player-panel]');
   const host = document.querySelector<HTMLElement>('[data-tmc-player-host]');
   const trigger = document.querySelector<HTMLButtonElement>('[data-tmc-player-toggle]');
+  const triggerLabel = trigger?.querySelector<HTMLElement>('[data-tmc-player-toggle-label]');
+  const playIcon = trigger?.querySelector<HTMLElement>('[data-tmc-player-play]');
+  const stopIcon = trigger?.querySelector<HTMLElement>('[data-tmc-player-stop]');
   const title = document.querySelector<HTMLElement>('[data-tmc-player-title]');
   const status = document.querySelector<HTMLElement>('[data-tmc-player-status]');
   const move = document.querySelector<HTMLButtonElement>('[data-tmc-player-move]');
@@ -18,7 +21,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
   const sizing = document.querySelector<HTMLElement>('[data-tmc-player-sizing]');
   const size = document.querySelector<HTMLInputElement>('[data-tmc-player-height]');
   const chat = document.querySelector<HTMLElement>('.tmc-chat');
-  if (!panel || !host || !trigger || !title || !status || !move || !close || !sizing || !size || !chat) throw new Error('Player UI is incomplete.');
+  if (!panel || !host || !trigger || !triggerLabel || !playIcon || !stopIcon || !title || !status || !move || !close || !sizing || !size || !chat) throw new Error('Player UI is incomplete.');
   const lifetime = new AbortController();
   let requested = false, loading = false, moving = false, layoutReady = false;
   let context: TmcPlayerContext | null = null;
@@ -31,6 +34,14 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     return profileId && currentChannel ? { profileId, channel: currentChannel } : null;
   };
   const same = (a: TmcPlayerContext | null, b: TmcPlayerContext | null): boolean => !!a && !!b && a.profileId === b.profileId && a.channel === b.channel;
+  const updateTrigger = (): void => {
+    triggerLabel.textContent = requested ? 'Close live' : 'Show live';
+    playIcon.hidden = requested; stopIcon.hidden = !requested;
+    trigger.dataset.state = requested ? 'open' : 'closed';
+    trigger.title = requested ? 'Close the live player' : 'Open live video for the current channel';
+    trigger.setAttribute('aria-expanded', String(!panel.hidden));
+    trigger.disabled = !selected();
+  };
   const available = (): number => {
     let other = 0;
     for (const child of chat.children) if (child !== panel && !child.classList.contains('tmc-chat-feed')) other += child.getBoundingClientRect().height;
@@ -61,7 +72,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     layoutReady = value.state === 'loading' || value.state === 'ready';
     if (value.state === 'closed') requested = false;
     panel.hidden = value.state === 'closed';
-    trigger.textContent = requested ? 'Hide live' : 'Show live'; trigger.setAttribute('aria-expanded', String(!panel.hidden));
+    updateTrigger();
     panel.dataset.state = value.state; panel.dataset.mode = mode;
     title.textContent = `Live · #${value.channel}`;
     status.textContent = value.message || (value.state === 'loading' ? 'Opening player…' : mode === 'detached'
@@ -74,11 +85,12 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     const target = selected(); const operation = ++revision;
     if (!target) {
       const old = context; requested = false; loading = false; layoutReady = false; panel.hidden = true; context = null;
-      trigger.textContent = 'Show live'; trigger.disabled = true; trigger.setAttribute('aria-expanded', 'false'); viewportChanged();
+      updateTrigger(); viewportChanged();
       if (old) try { await tmc.player.close(old); } catch { if (!lifetime.signal.aborted && operation === revision) showError('Player cleanup failed. Reopen the app.'); }
       return;
     }
     context = target; loading = true; layoutReady = false; panel.hidden = false;
+    updateTrigger();
     title.textContent = `Live · #${target.channel}`; status.textContent = 'Opening player…';
     host.hidden = false; sizing.hidden = false; host.style.height = `${desiredHeight}px`;
     if (mode !== 'detached' && (available() < 300 || host.getBoundingClientRect().width < 400)) mode = 'detached';
@@ -100,7 +112,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     finally { moving = false; if (!lifetime.signal.aborted) { configure(); schedule(); } }
   };
   const synchronize = async (): Promise<void> => {
-    trigger.disabled = !selected();
+    updateTrigger();
     if (!requested || !context || panel.dataset.state === 'error') return;
     if (loading || moving) {
       if (mode === 'embedded' && layoutReady) {
@@ -125,7 +137,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
   const stop = async (): Promise<void> => {
     const target = context, operation = ++revision;
     requested = false; loading = false; layoutReady = false; panel.hidden = true;
-    trigger.textContent = 'Show live'; trigger.setAttribute('aria-expanded', 'false'); viewportChanged();
+    updateTrigger(); viewportChanged();
     if (!target) return;
     try { const result = await tmc.player.close(target); if (operation === revision) render(result); }
     catch { if (!lifetime.signal.aborted && operation === revision && same(target, selected())) showError('Player cleanup failed. Reopen the app before playing again.'); }
