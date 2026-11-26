@@ -27,131 +27,87 @@ const DEFAULT_CHANNEL_STORE: PersistedAccountChannelState = {
  * Stores non-secret per-account channel state.
  */
 export class TmcAccountChannelStore {
-  private readonly jsonStore: JsonFileStore<PersistedAccountChannelState>;
+  private readonly jsonStore: JsonFileStore<unknown>;
+  private pending: Promise<void> = Promise.resolve();
 
-  /**
-   * Creates a per-account channel store under Electron userData.
-   */
   constructor(userDataPath: string) {
-    this.jsonStore = new JsonFileStore<PersistedAccountChannelState>(
-      path.join(userDataPath, 'tmc-account-channels.json'),
-      DEFAULT_CHANNEL_STORE,
+    this.jsonStore = new JsonFileStore<unknown>(
+      path.join(userDataPath, 'tmc-account-channels.json'), DEFAULT_CHANNEL_STORE,
     );
   }
 
-  /**
-   * Returns the channel state for a profile identifier.
-   */
   async getState(profileId: string): Promise<TmcAccountChannelState> {
-    const store = await this.loadStore();
-    const normalizedProfileId = normalizeProfileId(profileId);
-
-    return normalizeState(store.states[normalizedProfileId], normalizedProfileId);
+    const id = normalizeProfileId(profileId);
+    return this.serialize(async () => normalizeState((await this.loadStore()).states[id], id));
   }
 
-  /**
-   * Sets the last selected channel for a profile.
-   */
-  async setLastChannel(
-    profileId: string,
-    channel: string,
-  ): Promise<TmcAccountChannelState> {
+  async setLastChannel(profileId: string, channel: string): Promise<TmcAccountChannelState> {
     const normalizedChannel = normalizeRequiredChannel(channel);
-    const currentState = await this.getState(profileId);
-    const nextState: TmcAccountChannelState = {
-      ...currentState,
-      lastChannel: normalizedChannel,
-      updatedAt: Date.now(),
-    };
-
-    await this.saveState(nextState);
-
-    return nextState;
+    return this.update(profileId, (current) => ({ ...current, lastChannel: normalizedChannel, updatedAt: Date.now() }));
   }
 
-  /**
-   * Adds a channel to the recent list for a profile.
-   */
-  async addRecentChannel(
-    profileId: string,
-    channel: string,
-  ): Promise<TmcAccountChannelState> {
+  async addRecentChannel(profileId: string, channel: string): Promise<TmcAccountChannelState> {
     const normalizedChannel = normalizeRequiredChannel(channel);
-    const currentState = await this.getState(profileId);
-    const recentChannels = [
-      normalizedChannel,
-      ...currentState.recentChannels.filter(
-        (recentChannel) => recentChannel !== normalizedChannel,
-      ),
-    ].slice(0, MAX_RECENT_CHANNELS);
-    const nextState: TmcAccountChannelState = {
-      ...currentState,
-      recentChannels,
+    return this.update(profileId, (current) => ({ ...current,
+      recentChannels: [normalizedChannel, ...current.recentChannels.filter((entry) => entry !== normalizedChannel)].slice(0, MAX_RECENT_CHANNELS),
       updatedAt: Date.now(),
-    };
-
-    await this.saveState(nextState);
-
-    return nextState;
+    }));
   }
 
-  /**
-   * Toggles a channel in the favorite list for a profile.
-   */
-  async toggleFavoriteChannel(
-    profileId: string,
-    channel: string,
-  ): Promise<TmcAccountChannelState> {
+  async toggleFavoriteChannel(profileId: string, channel: string): Promise<TmcAccountChannelState> {
     const normalizedChannel = normalizeRequiredChannel(channel);
-    const currentState = await this.getState(profileId);
-    const favoriteSet = new Set(currentState.favoriteChannels);
+    return this.update(profileId, (current) => {
+      const favorites = new Set(current.favoriteChannels);
+      if (favorites.has(normalizedChannel)) favorites.delete(normalizedChannel); else favorites.add(normalizedChannel);
+      return { ...current, favoriteChannels: [...favorites].sort(), updatedAt: Date.now() };
+    });
+  }
 
-    if (favoriteSet.has(normalizedChannel)) {
-      favoriteSet.delete(normalizedChannel);
-    } else {
-      favoriteSet.add(normalizedChannel);
-    }
+  private update(profileId: string, change: (current: TmcAccountChannelState) => TmcAccountChannelState): Promise<TmcAccountChannelState> {
+    const id = normalizeProfileId(profileId);
+    return this.serialize(async () => {
+      const store = await this.loadStore();
+      const next = change(normalizeState(store.states[id], id));
+      await this.jsonStore.write({ states: { ...store.states, [id]: next } });
+      return next;
+    });
+  }
 
-    const nextState: TmcAccountChannelState = {
-      ...currentState,
-      favoriteChannels: Array.from(favoriteSet).sort(),
-      updatedAt: Date.now(),
-    };
-
-    await this.saveState(nextState);
-
-    return nextState;
+  private serialize<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
+    const result = this.pending.then(operation);
+    this.pending = result.then(() => undefined, () => undefined);
+    return result;
   }
 
   private async loadStore(): Promise<PersistedAccountChannelState> {
-    try {
-      const store = await this.jsonStore.read();
-      const normalizedStates: Record<string, TmcAccountChannelState> = {};
-
-      for (const [profileId, state] of Object.entries(store.states || {})) {
-        const normalizedProfileId = normalizeProfileId(profileId);
-        normalizedStates[normalizedProfileId] = normalizeState(
-          state,
-          normalizedProfileId,
-        );
+    const value = await this.jsonStore.read();
+    if (!isRecord(value) || !isRecord(value.states)) throw new Error('Channel preferences are invalid.');
+    const states = new Map<string, TmcAccountChannelState>();
+    for (const [profileId, raw] of Object.entries(value.states)) {
+      if (!isRecord(raw) || (raw.lastChannel !== undefined && raw.lastChannel !== null && typeof raw.lastChannel !== 'string')) {
+        throw new Error('Channel preferences are invalid.');
       }
-
-      return { states: normalizedStates };
-    } catch {
-      return DEFAULT_CHANNEL_STORE;
+      const id = normalizeProfileId(profileId);
+      states.set(id, normalizeState({ profileId: id,
+        lastChannel: typeof raw.lastChannel === 'string' ? raw.lastChannel : null,
+        recentChannels: readChannelList(raw.recentChannels), favoriteChannels: readChannelList(raw.favoriteChannels),
+        updatedAt: typeof raw.updatedAt === 'number' && Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0,
+      }, id));
     }
+    return { states: Object.fromEntries(states) };
   }
+}
 
-  private async saveState(state: TmcAccountChannelState): Promise<void> {
-    const store = await this.loadStore();
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
-    await this.jsonStore.write({
-      states: {
-        ...store.states,
-        [state.profileId]: normalizeState(state, state.profileId),
-      },
-    });
+function readChannelList(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || !value.every((entry: unknown): entry is string => typeof entry === 'string')) {
+    throw new Error('Channel preferences are invalid.');
   }
+  return value;
 }
 
 function normalizeState(

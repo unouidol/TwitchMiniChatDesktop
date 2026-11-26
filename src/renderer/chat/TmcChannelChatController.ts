@@ -297,6 +297,7 @@ export class TmcChannelChatController {
     });
 
     await this.holdPcgSessionForChannelChange(generation);
+    if (!this.isCurrentGeneration(generation)) return;
 
     this.setRefreshDisabled(true);
     this.scrollController?.resetForContextChange();
@@ -307,13 +308,15 @@ export class TmcChannelChatController {
     try {
       const active = await this.tmc.accounts.getActive();
       if (!this.isCurrentGeneration(generation)) return;
-      if (!active.isLoggedIn) {
+      if (!active.isLoggedIn || !active.activeProfileId) {
         this.appendLocalMessage('system', 'Use Login to sign in, load chat history and connect to live chat.');
         return;
       }
       this.appendLocalMessage('system', `Loading history for #${normalizedChannel}...`);
-      await this.tmc.accountChannels.setLast({ channel: normalizedChannel });
+      await this.tmc.accountChannels.setLast({ profileId: active.activeProfileId, channel: normalizedChannel });
+      if (!this.isCurrentGeneration(generation)) return;
       const channelStateResult = await this.tmc.accountChannels.addRecent({
+        profileId: active.activeProfileId,
         channel: normalizedChannel,
       });
 
@@ -328,6 +331,7 @@ export class TmcChannelChatController {
         generation,
       );
 
+      if (!this.isCurrentGeneration(generation)) return;
       const result = await this.tmc.backend.loadHistory({
         channel: normalizedChannel,
         seconds: HISTORY_WINDOW_SECONDS,
@@ -405,7 +409,9 @@ export class TmcChannelChatController {
   }
 
   private async switchToActiveAccountChannel(): Promise<void> {
+    const generation = this.generation;
     const result = await this.tmc.accountChannels.getActiveState();
+    if (!this.isCurrentGeneration(generation)) return;
     const state = result.state;
     const previousProfileId = this.activeChannelState?.profileId || null;
     const sameProfile = previousProfileId === state.profileId;
@@ -418,23 +424,25 @@ export class TmcChannelChatController {
 
     console.debug('[TMC Channel] active-account restore', { channel });
 
-    if (channel) {
+    if (channel && this.isCurrentGeneration(generation)) {
       await this.switchToChannel(channel);
     }
   }
 
   private async reconnectCurrentChannelAfterAccountChange(): Promise<void> {
+    const generation = this.generation;
     try {
       const status = await this.tmc.chat.getStatus();
-
+      if (!this.isCurrentGeneration(generation)) return;
       if (status.state === 'connected' || status.state === 'connecting') {
         await this.tmc.chat.disconnectLive({ channel: status.channel || undefined });
       }
     } catch {
       // A failed disconnect should not block reconnecting with the active account.
     }
-
-    await this.switchToActiveAccountChannel();
+    if (!this.isCurrentGeneration(generation)) return;
+    try { await this.switchToActiveAccountChannel(); }
+    catch (error) { if (this.isCurrentGeneration(generation)) this.appendLocalMessage('error', getErrorMessage(error)); }
   }
 
   private async connectLiveForChannel(
@@ -492,16 +500,16 @@ export class TmcChannelChatController {
 
   private async toggleFavoriteForCurrentChannel(): Promise<void> {
     const channel = this.readCurrentChannel();
-
-    if (!channel) {
-      return;
-    }
-
+    const profileId = this.activeChannelState?.profileId;
+    const generation = this.generation;
+    if (!channel || !profileId) return;
     try {
-      const result = await this.tmc.accountChannels.toggleFavorite({ channel });
-      this.renderAccountChannelState(result.state);
+      const result = await this.tmc.accountChannels.toggleFavorite({ profileId, channel });
+      if (this.isCurrentGeneration(generation) && this.activeChannelState?.profileId === profileId && this.currentChannel === channel) {
+        this.renderAccountChannelState(result.state);
+      }
     } catch (error) {
-      this.appendLocalMessage('error', getErrorMessage(error));
+      if (this.isCurrentGeneration(generation)) this.appendLocalMessage('error', getErrorMessage(error));
     }
   }
 

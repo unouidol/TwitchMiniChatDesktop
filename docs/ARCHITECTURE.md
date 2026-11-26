@@ -479,6 +479,14 @@ account removal still resolve selection through the existing registry methods.
 ## Chat and account state
 
 Account-scoped recent/favorite/last channels live in `TmcAccountChannelStore`.
+One owner serializes each complete read/derive/write transaction and queued reads;
+a rejection does not poison subsequent operations. Read/JSON/schema failures
+propagate and preserve the file rather than becoming empty defaults. The fixed
+atomic temporary file is never written concurrently by this owner; persistent
+filesystem failures still reject without speculative retries. Trusted local IPC
+requires the initiating profile identity, matches it to main selection and rejects
+stale completions. Renderer generation checks suppress later requests and sidebar
+updates after an account/context change, including held preference operations.
 `registerChatIpcHandlers.ts` creates one `TmcTwitchIrcClient`, so saved multiaccount
 support currently does not mean one simultaneous IRC connection per account.
 

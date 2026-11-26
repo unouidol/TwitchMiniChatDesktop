@@ -6,6 +6,13 @@ The maintainer remains responsible for reviewing and accepting each change.
 
 ## Local setup and checks
 
+Channel-preference regressions exercise complete concurrent A/B transactions,
+read-after-write ordering, failed writes/reads and queue recovery, corrupt-file
+preservation and fresh-store persistence. IPC tests reject foreign senders,
+invalid/mismatched identities and stale completions; renderer tests hold requests
+across account changes to prevent old recent/history requests or sidebar updates.
+These checks substitute storage/IPC boundaries, not transaction or identity logic.
+
 Welcome/update tests and the public GitHub/site contract are documented in
 [welcome and updates](docs/welcome-and-updates.md). Synthetic UI tests replace
 only release-metadata transport with local HTTP; automated tests must not query
