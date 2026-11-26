@@ -65,7 +65,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     panel.dataset.state = value.state; panel.dataset.mode = mode;
     title.textContent = `Live · #${value.channel}`;
     status.textContent = value.message || (value.state === 'loading' ? 'Opening player…' : mode === 'detached'
-      ? 'Player open in a separate window. Enlarge the app to show it above chat.' : 'Twitch shows playback and live/offline status in the player.');
+      ? 'Player open in a separate window. Twitch sign-in is shared with PCG.' : 'Twitch sign-in is shared with PCG. Sign in there to use your channel benefits here.');
     configure();
     if (value.state === 'error') { host.hidden = true; sizing.hidden = true; }
     viewportChanged(); schedule();

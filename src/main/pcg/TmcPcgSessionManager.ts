@@ -13,6 +13,8 @@ import type {
   TmcPcgStatus,
 } from '../../shared/pcg/TmcPcgModels';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
+import { buildTwitchWebPartition } from '../web/TmcTwitchWebPartition';
+import type { TmcTwitchWebSessions } from '../web/TmcTwitchWebSessions';
 
 const HIDDEN_BOUNDS: Rectangle = { x: 0, y: 0, width: 0, height: 0 };
 const TWITCH_LOGIN_URL = 'https://www.twitch.tv/login';
@@ -43,6 +45,7 @@ export class TmcPcgSessionManager {
     message: null,
   };
   private view: WebContentsView | null = null;
+  private canDisplayView = false;
   private attachedWindow: BrowserWindow | null = null;
   private currentBounds: Rectangle | null = null;
   private currentPartition: string | null = null;
@@ -61,6 +64,7 @@ export class TmcPcgSessionManager {
   constructor(
     private readonly config: TmcRuntimeConfig,
     private readonly onStatusChanged: (status: TmcPcgStatus) => void,
+    private readonly webSessions: TmcTwitchWebSessions,
   ) {}
 
   /**
@@ -82,9 +86,7 @@ export class TmcPcgSessionManager {
       throw new Error('PCG profileId cannot be empty.');
     }
 
-    const safeProfileId = normalizedProfileId.replace(/[^a-zA-Z0-9_-]/g, '_');
-
-    return `persist:tmc-pcg-${safeProfileId}`;
+    return buildTwitchWebPartition(normalizedProfileId);
   }
 
   /**
@@ -98,7 +100,7 @@ export class TmcPcgSessionManager {
 
     this.currentBounds = normalizedBounds;
 
-    if (ownerWindow && !ownerWindow.isDestroyed()) {
+    if (this.canDisplayView && ownerWindow && !ownerWindow.isDestroyed()) {
       this.attachViewToWindow(ownerWindow);
     }
 
@@ -156,7 +158,7 @@ export class TmcPcgSessionManager {
         height: 720,
         minWidth: 720,
         minHeight: 560,
-        title: 'Sign in to Twitch for PCG',
+        title: 'Sign in to Twitch for PCG and video',
       },
     );
 
@@ -291,6 +293,8 @@ export class TmcPcgSessionManager {
       key = this.normalizeKey(profileId, channel);
     } catch (error) {
       ++this.activationRevision;
+      this.canDisplayView = false;
+      this.applyCurrentBounds();
       return this.setStatus({
         state: 'error',
         displayMode: this.status.displayMode,
@@ -304,6 +308,8 @@ export class TmcPcgSessionManager {
 
     if (!url) {
       ++this.activationRevision;
+      this.canDisplayView = false;
+      this.applyCurrentBounds();
       return this.setStatus({
         state: 'error',
         displayMode: this.status.displayMode,
@@ -327,6 +333,8 @@ export class TmcPcgSessionManager {
     }
 
     const activation = ++this.activationRevision;
+    this.canDisplayView = false;
+    this.applyCurrentBounds();
     this.panelUrl = url;
     this.setStatus({
       state: 'loading',
@@ -365,6 +373,8 @@ export class TmcPcgSessionManager {
       });
     } catch (error) {
       if (activation !== this.activationRevision) return this.status;
+      this.canDisplayView = false;
+      this.applyCurrentBounds();
       return this.setStatus({
         state: 'error',
         displayMode: this.status.displayMode,
@@ -387,12 +397,18 @@ export class TmcPcgSessionManager {
     ownerWindow: BrowserWindow | null,
   ): WebContentsView {
     const partition = this.buildPartition(profileId);
+    this.webSessions.get(profileId);
 
     if (
       this.view &&
       !this.view.webContents.isDestroyed() &&
       this.currentPartition === partition
     ) {
+      this.canDisplayView = true;
+      if (this.status.twitchAuth === 'unknown') {
+        this.stopTwitchAuthObservation?.();
+        this.observeTwitchAuthentication(this.view, profileId, partition);
+      }
       if (ownerWindow) {
         this.attachViewToWindow(ownerWindow);
       }
@@ -407,6 +423,7 @@ export class TmcPcgSessionManager {
     this.view = new WebContentsView({
       webPreferences: buildPcgWebPreferences(partition),
     });
+    this.canDisplayView = true;
     this.configurePcgWebContents(this.view, partition, ownerWindow);
     this.observeTwitchAuthentication(this.view, profileId, partition);
 
@@ -681,7 +698,7 @@ export class TmcPcgSessionManager {
   }
 
   private attachViewToWindow(ownerWindow: BrowserWindow): void {
-    if (!this.view || ownerWindow.isDestroyed()) {
+    if (!this.canDisplayView || !this.view || ownerWindow.isDestroyed()) {
       return;
     }
 
@@ -747,7 +764,7 @@ export class TmcPcgSessionManager {
       return;
     }
 
-    const bounds = this.status.displayMode === 'detached'
+    const bounds = !this.canDisplayView || this.status.displayMode === 'detached'
       ? HIDDEN_BOUNDS
       : this.currentBounds || HIDDEN_BOUNDS;
 

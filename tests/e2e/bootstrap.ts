@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { installNetworkGuards } from './network-guards';
 import { registerPlayerShutdown } from '../../src/main/player/registerPlayerShutdown';
+import { buildTwitchWebPartition } from '../../src/main/web/TmcTwitchWebPartition';
 
 function argument(name: string): string {
   const prefix = `--tmc-e2e-${name}=`;
@@ -125,8 +126,8 @@ void app.whenReady().then(async () => {
   const store = new TmcSecureAuthSessionStore();
   if (phase === 'first') {
     assert.equal(fs.existsSync(store.getFilePath()), false, 'First boot must use a fresh profile');
-    // Synthetic browser cookie only in B's isolated temporary partition. No login/network.
-    await session.fromPartition('persist:tmc-pcg-B').cookies.set({
+    // A remains signed out for the login-guidance scenario; later controls sign it in.
+    await session.fromPartition(buildTwitchWebPartition('B')).cookies.set({
       url: 'https://www.twitch.tv', name: 'auth-token', value: 'synthetic-browser-session-B',
       secure: true, httpOnly: true, expirationDate: Math.floor(Date.now() / 1000) + 3600,
     });
@@ -178,7 +179,8 @@ void app.whenReady().then(async () => {
   let sizeCommand = 0;
   let playbackRevision = 0;
   let previousPlayback = '';
-  const playerSecurity = new Map<number, { bridge: string; node: string; process: string; persistent: boolean; sandboxed: boolean }>();
+  const playerSecurity = new Map<number, { bridge: string; node: string; process: string; persistent: boolean;
+    sandboxed: boolean; sharedWithPcg: boolean; webSessionPresent: boolean }>();
   const probingSecurity = new Set<number>();
   let cookieCommand = '';
   let cookieCommandPending = false;
@@ -193,11 +195,18 @@ void app.whenReady().then(async () => {
         if (!playerSecurity.has(id) && !probingSecurity.has(id) && services.player.getStatus().state === 'ready') {
           probingSecurity.add(id);
           // Observe only the app-owned local wrapper, never remote Twitch/PCG DOM.
-          void contents.executeJavaScript('({ bridge: typeof window.tmc, node: typeof require, process: typeof process })').then((value: unknown) => {
+          const observedProfile = services.player.getStatus().profileId;
+          assert.ok(observedProfile);
+          const expectedSession = session.fromPartition(buildTwitchWebPartition(observedProfile));
+          void contents.executeJavaScript('({ bridge: typeof window.tmc, node: typeof require, process: typeof process })').then(async (value: unknown) => {
             assert.ok(value && typeof value === 'object' && 'bridge' in value && typeof value.bridge === 'string' &&
               'node' in value && typeof value.node === 'string' && 'process' in value && typeof value.process === 'string');
+            const cookies = await expectedSession.cookies.get({ url: 'https://www.twitch.tv', name: 'auth-token' });
+            if (contents.isDestroyed() || services.player.getStatus().profileId !== observedProfile) return;
             const metric = app.getAppMetrics().find((entry) => entry.pid === contents.getOSProcessId());
-            playerSecurity.set(id, { bridge: value.bridge, node: value.node, process: value.process, persistent: contents.session.isPersistent(), sandboxed: metric?.sandboxed === true });
+            playerSecurity.set(id, { bridge: value.bridge, node: value.node, process: value.process,
+              persistent: contents.session.isPersistent(), sandboxed: metric?.sandboxed === true,
+              sharedWithPcg: contents.session === expectedSession, webSessionPresent: cookies.some((cookie) => cookie.name === 'auth-token') });
           }).catch(() => { if (!contents.isDestroyed()) fail('Local player isolation observation failed'); }).finally(() => probingSecurity.delete(id));
         }
         return [{ id, windowId: owner.id, bounds: view.getBounds(), security: playerSecurity.get(id) || null }];
@@ -239,14 +248,15 @@ void app.whenReady().then(async () => {
     const commandPath = path.join(root, 'pcg-cookie-command');
     if (phase === 'first' && !cookieCommandPending && fs.existsSync(commandPath)) {
       const requested = fs.readFileSync(commandPath, 'utf8');
-      assert.ok(requested === 'present' || requested === 'missing');
+      assert.ok(requested === 'present' || requested === 'missing' || requested === 'present-A');
       if (requested !== cookieCommand) {
         cookieCommandPending = true;
-        const cookies = session.fromPartition('persist:tmc-pcg-B').cookies;
+        const profileId = requested === 'present-A' ? 'A' : 'B';
+        const cookies = session.fromPartition(buildTwitchWebPartition(profileId)).cookies;
         const operation = requested === 'missing'
           ? cookies.remove('https://www.twitch.tv', 'auth-token')
           : cookies.set({ url: 'https://www.twitch.tv', name: 'auth-token',
-            value: 'synthetic-browser-session-B', secure: true, httpOnly: true,
+            value: `synthetic-browser-session-${profileId}`, secure: true, httpOnly: true,
             expirationDate: Math.floor(Date.now() / 1000) + 3600 });
         void operation.then(() => {
           cookieCommand = requested;

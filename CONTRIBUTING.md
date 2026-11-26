@@ -13,7 +13,7 @@ GitHub or download/install a release. New checks retain the existing network gua
 
 Player unit tests exercise the actual loopback source's path/channel validation,
 CSP, retired documents and listener closure, plus manager ownership with Electron
-boundaries substituted: reparenting versus destruction, memory-session cleanup,
+boundaries substituted: reparenting versus destruction, shared-session preservation,
 stale creation/cancellation, disappearing native getters, modal occlusion before
 creation, permission/navigation denial and load deadlines. Player IPC rejects
 foreign frames, malformed contexts, dimensions and occlusion payloads.
@@ -26,12 +26,22 @@ IDs/bounds/destruction and a one-time capability observation of the app-owned
 local wrapper (never remote Twitch or PCG DOM). Tests keep provider playback
 substitution distinct from real-video evidence, and check held loading/modal
 occlusion, resizing, channel drafts/history refresh, reparenting, account changes,
-window-close cleanup, owner reload while login is open, independent PCG and no
+window-close cleanup, owner reload while login is open, PCG view preservation and no
 chat sends. App shutdown with video
 still active is exercised; source/view cleanup observations are retained without
 credentials or provider DOM. Native window resizing/closing
 uses bounded commands in the test-owned root because this Electron build lacks
 ChromeDriver's native-window-size CDP command; no production test IPC is added.
+
+PCG and playback share one persistent Chromium session per registered account;
+the main web-session owner installs permission policy once. Unit regressions
+forbid player calls that clear shared storage/cache/authentication/connections,
+check A/B separation and retained legacy paths, reject unknown/case-aliased IDs,
+and keep unsafe IDs in a disjoint namespace. Synthetic playback observes only
+the owned local wrapper and native session identity/persistence plus synthetic
+cookie presence. B's PCG session must survive active-video exit and full restart.
+No real login, cookie value, subscription status or ad-free result is asserted.
+See [shared Twitch web access](docs/twitch-web-access.md) for manual acceptance.
 
 Search tests cover literal/Unicode/case matching, author and original emote-code
 lookup, both navigation directions, live arrivals without navigation, draft

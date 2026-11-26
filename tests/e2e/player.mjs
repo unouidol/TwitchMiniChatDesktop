@@ -31,7 +31,8 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     const first = await readPlayback();
     const videoId = first.playerViews[0].id;
     assert.equal(first.playerViews[0].windowId, first.mainWindowId);
-    assert.deepEqual(first.playerViews[0].security, { bridge: 'undefined', node: 'undefined', process: 'undefined', persistent: false, sandboxed: true });
+    assert.deepEqual(first.playerViews[0].security, { bridge: 'undefined', node: 'undefined', process: 'undefined',
+      persistent: true, sandboxed: true, sharedWithPcg: true, webSessionPresent: true });
     const pcgOnly = await settledNativeViews(browser, async () => (await readNativeViews()).filter((view) => view.id !== videoId));
     await browser.$('[data-tmc-account-menu] summary').click();
     await browser.$('[data-tmc-welcome-open]').click();
@@ -86,7 +87,8 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     assert.notEqual(secondId, videoId);
     await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'B');
     await browser.waitUntil(async () => {
-      const value = await readPlayback(); return value.status.state === 'ready' && value.status.profileId === 'B' && value.destroyed.includes(secondId);
+      const value = await readPlayback(); return value.status.state === 'ready' && value.status.profileId === 'B' &&
+        value.destroyed.includes(secondId) && value.playerViews[0]?.security?.sharedWithPcg && value.playerViews[0]?.security?.webSessionPresent;
     });
     const thirdId = (await readPlayback()).playerViews[0].id;
     await closeOwnedPlayerWindow();

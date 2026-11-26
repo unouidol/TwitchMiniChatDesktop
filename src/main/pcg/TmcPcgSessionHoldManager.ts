@@ -2,6 +2,7 @@ import type {
   TmcPcgSessionKey,
   TmcPcgSessionStatus,
 } from '../../shared/pcg/TmcPcgSessionModels';
+import { buildTwitchWebPartition } from '../web/TmcTwitchWebPartition';
 
 /**
  * Default grace window before a hidden PCG session is destroyed.
@@ -309,9 +310,7 @@ export class TmcPcgSessionHoldManager {
  * Prepares account-isolated persistent web storage for future PCG web sessions.
  */
 export function buildPcgPartition(profileId: string): string {
-  const safeProfileId = profileId.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-
-  return `persist:tmc-pcg-${safeProfileId || 'guest'}`;
+  return buildTwitchWebPartition(profileId.trim() || 'guest');
 }
 
 function normalizeChannel(channel: string): string {

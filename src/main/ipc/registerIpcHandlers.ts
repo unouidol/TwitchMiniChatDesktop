@@ -32,6 +32,7 @@ import { registerPlayerIpcHandlers } from './registerPlayerIpcHandlers';
 import { JsonFileStore } from '../storage/JsonFileStore';
 import { registerWelcomeIpcHandlers } from './registerWelcomeIpcHandlers';
 import path from 'node:path';
+import { TmcTwitchWebSessions } from '../web/TmcTwitchWebSessions';
 
 /**
  * Registers application-level Inter-Process Communication handlers.
@@ -52,6 +53,7 @@ export async function registerIpcHandlers(
   );
 
   const accountChannelStore = new TmcAccountChannelStore(app.getPath('userData'));
+  const webSessions = new TmcTwitchWebSessions(() => accountRegistry.listAccounts().accounts.map((account) => account.profileId));
   const pcgSessionHoldManager = new TmcPcgSessionHoldManager();
   const pcgSessionManager = new TmcPcgSessionManager(runtimeConfig, (status) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -59,7 +61,7 @@ export async function registerIpcHandlers(
         window.webContents.send(TMC_IPC_CHANNELS.PCG_STATUS_CHANGED, status);
       }
     }
-  });
+  }, webSessions);
 
   await accountRegistry.initialize();
   await secureAuthSessionStore.loadSession();
@@ -109,7 +111,7 @@ export async function registerIpcHandlers(
   registerBackendIpcHandlers(runtimeConfig, authSessionStore, accountRegistry);
   const player = new TmcPlayerManager(() => accountRegistry.getActiveSession()?.profileId || null, (status) => {
     for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(TMC_IPC_CHANNELS.PLAYER_CHANGED, status);
-  });
+  }, webSessions);
   registerPlayerIpcHandlers(player);
   return { player };
 }
