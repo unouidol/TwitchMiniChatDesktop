@@ -42,6 +42,8 @@ export type TmcActiveAccountChannelStateResult = {
  * Request used to set the last selected channel.
  */
 export type TmcSetLastChannelRequest = {
+  /** Initiating account identity, checked against main-process selection. */
+  readonly profileId: string;
   /**
    * Twitch channel name, with or without a leading hash.
    */
@@ -52,6 +54,8 @@ export type TmcSetLastChannelRequest = {
  * Request used to toggle a favorite channel.
  */
 export type TmcToggleFavoriteChannelRequest = {
+  /** Initiating account identity, checked against main-process selection. */
+  readonly profileId: string;
   /**
    * Twitch channel name, with or without a leading hash.
    */
