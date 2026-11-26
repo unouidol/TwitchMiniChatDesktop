@@ -64,7 +64,8 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     size.value = String(Math.max(300, Math.min(desiredHeight, Number(size.max))));
     host.style.height = `${size.value}px`;
   };
-  const showError = (message: string): void => { panel.hidden = false; host.hidden = true; sizing.hidden = true; panel.dataset.state = 'error'; status.textContent = message; viewportChanged(); };
+  const setStatus = (message: string): void => { status.textContent = message; status.hidden = !message; };
+  const showError = (message: string): void => { panel.hidden = false; host.hidden = true; sizing.hidden = true; panel.dataset.state = 'error'; setStatus(message); viewportChanged(); };
   const render = (value: TmcPlayerStatus): void => {
     const target = value.profileId && value.channel ? { profileId: value.profileId, channel: value.channel } : null;
     if (lifetime.signal.aborted || value.sequence < sequence || !same(target, selected())) return;
@@ -75,8 +76,8 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     updateTrigger();
     panel.dataset.state = value.state; panel.dataset.mode = mode;
     title.textContent = `Live · #${value.channel}`;
-    status.textContent = value.message || (value.state === 'loading' ? 'Opening player…' : mode === 'detached'
-      ? 'Player open in a separate window. Twitch sign-in is shared with PCG.' : 'Twitch sign-in is shared with PCG. Sign in there to use your channel benefits here.');
+    setStatus(value.message || (value.state === 'loading' ? 'Opening player\u2026'
+      : mode === 'detached' ? 'Player open in a separate window.' : ''));
     configure();
     if (value.state === 'error') { host.hidden = true; sizing.hidden = true; }
     viewportChanged(); schedule();
@@ -91,7 +92,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     }
     context = target; loading = true; layoutReady = false; panel.hidden = false;
     updateTrigger();
-    title.textContent = `Live · #${target.channel}`; status.textContent = 'Opening player…';
+    title.textContent = `Live · #${target.channel}`; setStatus('Opening player\u2026');
     host.hidden = false; sizing.hidden = false; host.style.height = `${desiredHeight}px`;
     if (mode !== 'detached' && (available() < 300 || host.getBoundingClientRect().width < 400)) mode = 'detached';
     configure();
@@ -156,7 +157,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     if (!target) return;
     const operation = revision;
     void tmc.chat.openLink({ url: `https://www.twitch.tv/${encodeURIComponent(target.channel)}` }).catch(() => {
-      if (operation === revision && !lifetime.signal.aborted) status.textContent = 'Could not open Twitch in your browser. Try again.';
+      if (operation === revision && !lifetime.signal.aborted) setStatus('Could not open Twitch in your browser. Try again.');
     });
   }, { signal: lifetime.signal });
   move.addEventListener('click', () => { void changeMode(mode === 'embedded' ? 'detached' : 'embedded'); }, { signal: lifetime.signal });

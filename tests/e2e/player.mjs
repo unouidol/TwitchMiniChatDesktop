@@ -92,6 +92,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
       await browser.waitUntil(async () => fixture.playerCalls.length > initialCalls);
       await browser.waitUntil(async () => (await readPlayback()).playerViews.length === 1);
       await checkToggle(true);
+      assert.equal(await browser.$('[data-tmc-player-status]').getText(), 'Opening player\u2026');
       assert.equal((await readPlayback()).status.mode, 'embedded', 'The intended startup layout embeds video above the feed');
       await browser.$('[data-tmc-auth-login]').click();
       await browser.$('[data-tmc-auth-dialog]').waitForDisplayed();
@@ -103,6 +104,8 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
       const value = await readPlayback();
       return value.status.state === 'ready' && value.playerViews[0]?.security;
     });
+    await browser.$('[data-tmc-player-status]').waitForDisplayed({ reverse: true });
+    assert.equal(await browser.$('[data-tmc-player-status]').getText(), '');
     const first = await readPlayback();
     await checkToggle(true);
     await browser.saveScreenshot(path.join(evidence, 'player-control-open.png'));
@@ -152,11 +155,13 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     await waitForDetachedFit();
     await checkToggle(true);
     assert.equal((await readPlayback()).playerViews[0].id, videoId, 'Detach retains the actual playback WebContents');
+    assert.equal(await browser.$('[data-tmc-player-status]').getText(), 'Player open in a separate window.');
     assert.equal(await browser.$('[data-tmc-player-move]').getText(), 'Attach video');
     await browser.$('[data-tmc-player-move]').waitForEnabled(); await browser.$('[data-tmc-player-move]').click();
     await browser.waitUntil(async () => (await readPlayback()).status.mode === 'embedded');
     assert.equal((await readPlayback()).playerViews[0].id, videoId);
     assert.equal(await browser.$('[data-tmc-player-move]').getText(), 'Detach video');
+    assert.equal(await browser.$('[data-tmc-player-status]').isDisplayed(), false);
     assert.equal(fixture.playerCalls.length, callsBeforeMoving, 'Detaching and attaching never reloads the video');
     await browser.$('[data-tmc-player-close]').click();
     await browser.waitUntil(async () => {
