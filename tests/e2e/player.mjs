@@ -46,7 +46,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
   await browser.saveScreenshot(path.join(evidence, 'player-control-closed.png'));
   assert.equal(await panel.isDisplayed(), false);
   assert.equal((await readPlayback()).sourceActive, false, 'No video source before explicit opening');
-  const original = await resizeOwnedWindow(1160, 1100);
+  const original = (await readPlayback()).mainWindowBounds;
   try {
     fixture.holdPlayer();
     try {
@@ -54,7 +54,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
       await browser.waitUntil(async () => fixture.playerCalls.length > initialCalls);
       await browser.waitUntil(async () => (await readPlayback()).playerViews.length === 1);
       await checkToggle(true);
-      assert.equal((await readPlayback()).status.mode, 'embedded', 'Large viewport embeds video above the feed');
+      assert.equal((await readPlayback()).status.mode, 'embedded', 'The startup window embeds video above the feed without a manual resize');
       await browser.$('[data-tmc-auth-login]').click();
       await browser.$('[data-tmc-auth-dialog]').waitForDisplayed();
       await browser.waitUntil(async () => (await readPlayback()).playerViews[0]?.bounds.width === 0);
@@ -107,14 +107,19 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     await browser.$('#channelInput').setValue('fixture-channel');
     await browser.$('#openChannelButton').click(); await browser.$('#openChannelButton').waitForEnabled();
     await browser.waitUntil(async () => (await readPlayback()).status.channel === 'fixture-channel' && (await readPlayback()).status.state === 'ready');
+    const callsBeforeMoving = fixture.playerCalls.length;
+    assert.equal(await browser.$('[data-tmc-player-move]').getText(), 'Detach video');
     await browser.$('[data-tmc-player-move]').click();
     await browser.waitUntil(async () => (await readPlayback()).status.mode === 'detached');
     await waitForDetachedFit();
     await checkToggle(true);
     assert.equal((await readPlayback()).playerViews[0].id, videoId, 'Detach retains the actual playback WebContents');
+    assert.equal(await browser.$('[data-tmc-player-move]').getText(), 'Attach video');
     await browser.$('[data-tmc-player-move]').waitForEnabled(); await browser.$('[data-tmc-player-move]').click();
     await browser.waitUntil(async () => (await readPlayback()).status.mode === 'embedded');
     assert.equal((await readPlayback()).playerViews[0].id, videoId);
+    assert.equal(await browser.$('[data-tmc-player-move]').getText(), 'Detach video');
+    assert.equal(fixture.playerCalls.length, callsBeforeMoving, 'Detaching and attaching never reloads the video');
     await browser.$('[data-tmc-player-close]').click();
     await browser.waitUntil(async () => {
       const value = await readPlayback(); return value.status.state === 'closed' && !value.sourceActive && value.destroyed.includes(videoId);

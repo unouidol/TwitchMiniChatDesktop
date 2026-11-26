@@ -56,7 +56,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
   };
   const configure = (): void => {
     host.hidden = mode !== 'embedded'; sizing.hidden = mode !== 'embedded';
-    move.textContent = mode === 'embedded' ? 'Open in window' : 'Show in chat';
+    move.textContent = mode === 'embedded' ? 'Detach video' : 'Attach video';
     const room = available();
     move.disabled = loading || moving || (mode === 'detached' && (room < 300 || chat.getBoundingClientRect().width < 400));
     move.title = move.disabled && mode === 'detached' ? 'Enlarge the app to keep video and chat readable.' : '';

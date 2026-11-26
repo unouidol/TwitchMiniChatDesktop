@@ -211,7 +211,7 @@ void app.whenReady().then(async () => {
         }
         return [{ id, windowId: owner.id, bounds: view.getBounds(), parentBounds: owner.contentView.getBounds(), security: playerSecurity.get(id) || null }];
       }));
-    const playback = JSON.stringify({ status: services.player.getStatus(), sourceActive: !!source, destroyed: [...destroyedContents], playerViews, mainWindowId: window.id });
+    const playback = JSON.stringify({ status: services.player.getStatus(), sourceActive: !!source, destroyed: [...destroyedContents], playerViews, mainWindowId: window.id, mainWindowBounds: window.getBounds() });
     if (playback !== previousPlayback) {
       if (++playbackRevision > 512) fail('Playback observation limit exceeded');
       const playbackPath = path.join(root, `${phase}-playback-${playbackRevision}.json`);

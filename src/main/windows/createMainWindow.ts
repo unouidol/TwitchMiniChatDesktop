@@ -20,8 +20,9 @@ declare const MAIN_WINDOW_VITE_NAME: string;
  */
 export function createMainWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
-    width: 1160,
-    height: 720,
+    // Leave room for embedded video, the chat feed and their controls at startup.
+    width: 1280,
+    height: 960,
     minWidth: 960,
     minHeight: 650,
     title: 'TMC desktop',
