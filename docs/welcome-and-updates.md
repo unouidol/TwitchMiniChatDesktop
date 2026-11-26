@@ -27,11 +27,15 @@ need Cloudflare credentials or an additional server to use the same pattern:
 - Download: the matching versioned GitHub release asset, opened by the existing
   validated browser-link operation. No installer is downloaded or run by the app.
 
-The site can later use that desktop endpoint and asset alongside its independent
-Android endpoint. Until an approved stable desktop release exists, its current
-Windows **Coming soon** state remains appropriate. This change does not edit or
-deploy the site, publish a GitHub release, tag a commit or upload installers.
-Publishing a first release remains a separately authorized step.
+The site now uses that desktop endpoint alongside its independent Android endpoint.
+Windows installer, release-note and SHA256SUMS links use GitHub's permanent
+`releases/latest` routes, following future stable releases without a redeploy or
+JavaScript. Keep the exact installer and checksum asset names in future releases.
+An unsigned-package notice is visible beside the download, with no recommendation
+to disable Windows protections. Update that notice when signing is introduced.
+The first stable `v1.1.0` release and site update were authorized on 2026-11-26;
+see [the publication record](releases/1.1.0.md). Future publication and repository
+settings changes still require explicit authorization.
 
 ## Scheduling, failures and privacy
 
@@ -71,6 +75,7 @@ The packaged smoke test covers actual protected first-launch welcome and no
 repeat on restart, without contacting GitHub or completing a real login.
 
 These tests do not establish a live stable-release download, installer upgrade,
-real OAuth/PCG/video acceptance, signing or website deployment. The existing
-desktop GitHub releases were prereleases when inspected on 2026-11-24, so the
-public stable endpoint must not currently be treated as an available update.
+real OAuth/PCG/video acceptance, signing or website deployment. Publication-time
+anonymous HTTP checks separately verified the stable `v1.1.0` installer route and
+checksum bytes. They do not establish an installed-app cold-start update check,
+installer execution or upgrade on another machine.
