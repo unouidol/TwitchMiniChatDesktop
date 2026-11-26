@@ -21,6 +21,29 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
   const draft = await browser.$('#messageInput').getValue();
   const trigger = await browser.$('[data-tmc-player-toggle]');
   const panel = await browser.$('[data-tmc-player-panel]');
+  const checkToggle = async (open) => {
+    await browser.waitUntil(async () => (await trigger.getText()) === (open ? 'Close live' : 'Show live') &&
+      (await trigger.getAttribute('aria-expanded')) === String(open));
+    assert.equal(await trigger.getText(), open ? 'Close live' : 'Show live');
+    assert.equal(await trigger.getAttribute('aria-expanded'), String(open));
+    assert.equal(await trigger.$('[data-tmc-player-play]').isDisplayed(), !open);
+    assert.equal(await trigger.$('[data-tmc-player-stop]').isDisplayed(), open);
+  };
+  const checkHeaderPlacement = async () => {
+    const fits = await browser.execute(() => {
+      const button = globalThis.window.document.querySelector('[data-tmc-player-toggle]').getBoundingClientRect();
+      const heading = globalThis.window.document.querySelector('.tmc-chat-heading').getBoundingClientRect();
+      const chat = globalThis.window.document.querySelector('.tmc-chat').getBoundingClientRect();
+      return button.width > 0 && button.left >= heading.left && button.right <= chat.right &&
+        button.top >= heading.top && button.bottom <= heading.bottom;
+    });
+    assert.equal(fits, true, 'Primary player control must fit beside the channel at normal and minimum app widths');
+  };
+  assert.equal(await browser.execute(() => !!globalThis.window.document.querySelector('.tmc-chat-heading [data-tmc-player-toggle]')), true);
+  assert.equal(await browser.execute(() => !!globalThis.window.document.querySelector('.tmc-sidebar [data-tmc-player-toggle]')), false);
+  await checkToggle(false);
+  await checkHeaderPlacement();
+  await browser.saveScreenshot(path.join(evidence, 'player-control-closed.png'));
   assert.equal(await panel.isDisplayed(), false);
   assert.equal((await readPlayback()).sourceActive, false, 'No video source before explicit opening');
   const original = await resizeOwnedWindow(1160, 1100);
@@ -30,6 +53,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
       await trigger.click();
       await browser.waitUntil(async () => fixture.playerCalls.length > initialCalls);
       await browser.waitUntil(async () => (await readPlayback()).playerViews.length === 1);
+      await checkToggle(true);
       assert.equal((await readPlayback()).status.mode, 'embedded', 'Large viewport embeds video above the feed');
       await browser.$('[data-tmc-auth-login]').click();
       await browser.$('[data-tmc-auth-dialog]').waitForDisplayed();
@@ -42,6 +66,8 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
       return value.status.state === 'ready' && value.playerViews[0]?.security;
     });
     const first = await readPlayback();
+    await checkToggle(true);
+    await browser.saveScreenshot(path.join(evidence, 'player-control-open.png'));
     const videoId = first.playerViews[0].id;
     assert.equal(first.playerViews[0].windowId, first.mainWindowId);
     assert.deepEqual(first.playerViews[0].security, { bridge: 'undefined', node: 'undefined', process: 'undefined',
@@ -84,6 +110,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     await browser.$('[data-tmc-player-move]').click();
     await browser.waitUntil(async () => (await readPlayback()).status.mode === 'detached');
     await waitForDetachedFit();
+    await checkToggle(true);
     assert.equal((await readPlayback()).playerViews[0].id, videoId, 'Detach retains the actual playback WebContents');
     await browser.$('[data-tmc-player-move]').waitForEnabled(); await browser.$('[data-tmc-player-move]').click();
     await browser.waitUntil(async () => (await readPlayback()).status.mode === 'embedded');
@@ -92,8 +119,10 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     await browser.waitUntil(async () => {
       const value = await readPlayback(); return value.status.state === 'closed' && !value.sourceActive && value.destroyed.includes(videoId);
     });
+    await checkToggle(false);
     assert.deepEqual(await settledNativeViews(browser, readNativeViews), pcgOnly, 'Player operations preserve the native PCG identity and bounds');
     await resizeOwnedWindow(960, 650);
+    await checkHeaderPlacement();
     await trigger.click();
     await browser.waitUntil(async () => (await readPlayback()).status.state === 'ready');
     assert.equal((await readPlayback()).status.mode, 'detached', 'Small windows keep video in a separate window');
@@ -111,6 +140,16 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
       const value = await readPlayback(); return value.status.state === 'closed' && !value.sourceActive && value.destroyed.includes(thirdId);
     });
     await panel.waitForDisplayed({ reverse: true });
+    await checkToggle(false);
+    await trigger.click();
+    await browser.waitUntil(async () => (await readPlayback()).status.state === 'ready');
+    await waitForDetachedFit();
+    await checkToggle(true);
+    await trigger.click();
+    await browser.waitUntil(async () => {
+      const value = await readPlayback(); return value.status.state === 'closed' && !value.sourceActive && value.playerViews.length === 0;
+    });
+    await checkToggle(false);
     assert.equal(await browser.$('#messageInput').getValue(), draft);
     assert.equal(fixture.sentMessages.length, sentBefore, 'Playback never sends/replays chat');
     await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
