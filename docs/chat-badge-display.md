@@ -12,6 +12,11 @@ Backend main includes commit
 (history badge persistence), also present in the inspected local checkout at
 `9abfbdf1ff98293e189c87cbbf0db618497fa55c`. Its commit records production deployment
 on 2026-11-25; this desktop task does not independently verify server deployment.
+The separate backend integration note reports that new production rows were
+checked after that restart and carried badge/color metadata. That report is
+preserved as supplied evidence, not an independent database check by this task.
+The earlier note described badge removal; the icon restoration below supersedes
+that desktop state while keeping the same raw metadata contract.
 
 The IRC parser and ingestion callback retain `badges`, `badge-info` and `color`;
 the store adds optional columns and the endpoint returns:
