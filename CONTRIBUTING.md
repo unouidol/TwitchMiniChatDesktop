@@ -32,6 +32,13 @@ still active is exercised; source/view cleanup observations are retained without
 credentials or provider DOM. Native window resizing/closing
 uses bounded commands in the test-owned root because this Electron build lacks
 ChromeDriver's native-window-size CDP command; no production test IPC is added.
+On a sufficiently large desktop the player scenario opens video at the actual
+startup size without first enlarging it. A physically smaller runner first checks
+its constrained startup (separate video is allowed only with measured insufficient
+space), then uses the owned native resize boundary to exercise the intended
+1280x960 layout. Native startup/work-area geometry is observed read-only.
+The scenario checks readable feed/composer geometry and detach/attach labels
+while retaining the same playback surface without another provider load.
 The player-control scenario checks header placement at normal/minimum widths,
 Play/Stop icon and label state during loading, ready/detached playback, native
 close and repeat primary-button toggles. Its synthetic screenshots support visual

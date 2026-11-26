@@ -153,6 +153,21 @@ try {
 } catch (error) {
   result.error = String(error);
   errors.push(error);
+  if (browser) {
+    try {
+      result.failureUi = await browser.execute(() => {
+        const document = globalThis.window.document;
+        const dialog = document.querySelector('[data-tmc-welcome-dialog]');
+        const failure = document.querySelector('[data-tmc-welcome-error]');
+        return { welcomeReady: document.querySelector('[data-tmc-welcome-open]')?.getAttribute('data-ready'),
+          welcomeOpen: dialog?.hasAttribute('open'), welcomeOpening: dialog?.getAttribute('data-opening'),
+          welcomeError: failure?.textContent, welcomeErrorHidden: failure?.hidden,
+          authOpen: document.querySelector('[data-tmc-auth-dialog]')?.hasAttribute('open'),
+          viewport: { width: globalThis.window.innerWidth, height: globalThis.window.innerHeight } };
+      });
+      await browser.saveScreenshot(path.join(root, 'failure.png'));
+    } catch (diagnosticError) { result.diagnosticError = String(diagnosticError); }
+  }
 } finally {
   const attempt = async (operation) => { try { await operation(); return true; } catch (error) { errors.push(error); return false; } };
   for (const child of children) await attempt(() => stop(child));

@@ -47,6 +47,19 @@ set an ad-free flag, fetch alternative playback URLs, or claim that an OAuth sco
 native Session identity or a present cookie proves ad-free viewing. Recognition
 in this Electron embed needs a user-assisted real Twitch check.
 
+## Player authentication visibility
+
+The player has no permanent shared-login guidance. The PCG panel retains its
+conditional sign-in prompt when browser-session evidence is absent or unknown;
+a present session hides that prompt, while manual sign-in remains in its menu.
+The [documented player status methods and events](https://dev.twitch.tv/docs/embed/video-and-clips/)
+expose playback state, not viewer authentication. A playback failure, blocked
+autoplay, or a present cookie cannot reliably establish an anonymous or signed-in
+viewer. No automatic request to renew PCG login is inferred from these signals.
+The app does not inspect remote player DOM, private messages or token values to
+manufacture that status. A documented provider signal would be needed for a
+reliable player-triggered renewal prompt.
+
 ## Verification and acceptance
 
 Focused tests check registered-account selection, PCG legacy-session reuse,

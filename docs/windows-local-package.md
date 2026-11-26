@@ -78,7 +78,10 @@ synthetic credentials, chat connection or remote player is started.
 Checks cover the production ASAR file allowlist, configured security fuses,
 file-based UI/CSS/preload/IPC, empty accounts, first-launch login guidance, modal
 opening/closing, isolated preference writes and a full process restart. Captures
-and structured results remain in `.test-build/packaged-smoke-*/`. Cleanup attempts
+and structured results remain in `.test-build/packaged-smoke-*/`. When a driver
+is attached, failure diagnostics retain local welcome/auth dialog visibility,
+welcome error text and a screenshot from the isolated profile. Diagnostic capture
+does not replace the primary failure or change timeouts. Cleanup attempts
 all owned releases, retains primary and cleanup errors, confirms no matching
 profile-owned processes remain and removes only the verified profile. A profile
 is retained if process release cannot be established. `--fail-after-app-spawn`

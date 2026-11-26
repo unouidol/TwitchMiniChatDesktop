@@ -47,9 +47,18 @@ Secondary chat tools occupy their own row, with the heading kept within narrow
 chat columns. Icons require no remote asset or additional dependency. The
 renderer measures a resizable host above chat; main owns one TmcPlayerManager,
 one playback WebContentsView and at most one separate video window. It embeds
-only with at least 400x300 video pixels and 180px remaining feed space. Otherwise
-it opens/moves to a separate window without stealing focus; returning inline is
-explicit. Moving reparents the same WebContents rather than reloading playback.
+only with at least 400x300 video pixels and 180px remaining feed space. The main
+window starts at 1280x960 logical pixels so its default layout accommodates video
+and chat together on a sufficiently large desktop. Smaller displays or manually
+reduced windows retain the space-based fallback to a separate window without
+stealing focus; returning inline is explicit. Detach video / Attach video uses
+the existing reparenting operation in both directions. Moving reparents the same
+WebContents rather than reloading playback.
+The player shows transient loading/errors and a detached-window indication,
+without permanent shared-login guidance or an empty status row while embedded.
+The existing PCG prompt remains conditional on browser-session evidence. Twitch
+publishes no viewer-authentication event/status in its player API, so playback
+events or cookie presence are not treated as proof of video authentication.
 The separate player window opens at 1010x698 logical pixels, matching the user's
 confirmed final window measured on Windows at 96 DPI (994x659 client area).
 The detached video follows the captured native content View's bounds, including
