@@ -1,4 +1,4 @@
-import { app, BrowserWindow, safeStorage, session, shell, WebContentsView } from 'electron';
+import { app, BrowserWindow, safeStorage, screen, session, shell, WebContentsView } from 'electron';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -173,6 +173,7 @@ void app.whenReady().then(async () => {
   playerService = services.player;
   registerPlayerShutdown(services.player, () => fail('Player shutdown cleanup failed'));
   const window = createMainWindow();
+  const startupWindow = { bounds: window.getBounds(), workArea: screen.getDisplayMatching(window.getBounds()).workArea };
   // Read-only native-view observation. No renderer test API or IPC substitute.
   let previousBounds = '';
   let boundsRevision = 0;
@@ -211,7 +212,7 @@ void app.whenReady().then(async () => {
         }
         return [{ id, windowId: owner.id, bounds: view.getBounds(), parentBounds: owner.contentView.getBounds(), security: playerSecurity.get(id) || null }];
       }));
-    const playback = JSON.stringify({ status: services.player.getStatus(), sourceActive: !!source, destroyed: [...destroyedContents], playerViews, mainWindowId: window.id, mainWindowBounds: window.getBounds() });
+    const playback = JSON.stringify({ status: services.player.getStatus(), sourceActive: !!source, destroyed: [...destroyedContents], playerViews, mainWindowId: window.id, mainWindowBounds: window.getBounds(), startupWindow });
     if (playback !== previousPlayback) {
       if (++playbackRevision > 512) fail('Playback observation limit exceeded');
       const playbackPath = path.join(root, `${phase}-playback-${playbackRevision}.json`);

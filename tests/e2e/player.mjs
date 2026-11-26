@@ -17,7 +17,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     }, { interval: 100, timeoutMsg: 'Detached video must stably fit its actual native content view after menu layout' });
   };
   const sentBefore = fixture.sentMessages.length;
-  const initialCalls = fixture.playerCalls.length;
+  let initialCalls = fixture.playerCalls.length;
   const draft = await browser.$('#messageInput').getValue();
   const trigger = await browser.$('[data-tmc-player-toggle]');
   const panel = await browser.$('[data-tmc-player-panel]');
@@ -46,15 +46,53 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
   await browser.saveScreenshot(path.join(evidence, 'player-control-closed.png'));
   assert.equal(await panel.isDisplayed(), false);
   assert.equal((await readPlayback()).sourceActive, false, 'No video source before explicit opening');
-  const original = (await readPlayback()).mainWindowBounds;
+  const initial = await readPlayback();
+  const original = initial.mainWindowBounds;
+  assert.deepEqual({ width: original.width, height: original.height },
+    { width: initial.startupWindow.bounds.width, height: initial.startupWindow.bounds.height },
+    'Earlier UI checks must restore the actual startup size');
   try {
+    const workArea = initial.startupWindow.workArea;
+    if (workArea.width < 1280 || workArea.height < 960) {
+      // Windows may constrain creation to the runner's small physical desktop.
+      // Exercise that real startup first, then use the existing owned resize
+      // boundary to exercise the intended larger layout on this same runner.
+      await trigger.click();
+      await browser.waitUntil(async () => (await readPlayback()).status.state === 'ready');
+      const startupPlayback = await readPlayback();
+      if (startupPlayback.status.mode === 'detached') {
+        const room = await browser.execute(() => {
+          const document = globalThis.window.document;
+          const chat = document.querySelector('.tmc-chat');
+          const panel = document.querySelector('[data-tmc-player-panel]');
+          const sizing = document.querySelector('[data-tmc-player-sizing]');
+          const controls = [...chat.children].filter((child) => child !== panel && !child.classList.contains('tmc-chat-feed'));
+          return { width: chat.getBoundingClientRect().width,
+            videoHeight: chat.getBoundingClientRect().height - controls.reduce((sum, child) => sum + child.getBoundingClientRect().height, 0)
+              - panel.getBoundingClientRect().height - Number.parseFloat(globalThis.window.getComputedStyle(sizing).height) - 180 };
+        });
+        assert.ok(room.width < 400 || room.videoHeight < 300, 'Constrained startup may detach only when video and readable chat cannot fit');
+        await waitForDetachedFit();
+        assert.equal(await browser.$('[data-tmc-player-move]').isEnabled(), false);
+      } else {
+        assert.equal(startupPlayback.playerViews[0].windowId, startupPlayback.mainWindowId);
+      }
+      await browser.saveScreenshot(path.join(evidence, 'player-constrained-startup.png'));
+      await trigger.click();
+      await browser.waitUntil(async () => (await readPlayback()).status.state === 'closed' && !(await readPlayback()).sourceActive);
+      await resizeOwnedWindow(1280, 960);
+      initialCalls = fixture.playerCalls.length;
+    } else {
+      assert.equal(original.width, 1280, 'A sufficiently large desktop uses the intended startup width');
+      assert.equal(original.height, 960, 'A sufficiently large desktop uses the intended startup height');
+    }
     fixture.holdPlayer();
     try {
       await trigger.click();
       await browser.waitUntil(async () => fixture.playerCalls.length > initialCalls);
       await browser.waitUntil(async () => (await readPlayback()).playerViews.length === 1);
       await checkToggle(true);
-      assert.equal((await readPlayback()).status.mode, 'embedded', 'The startup window embeds video above the feed without a manual resize');
+      assert.equal((await readPlayback()).status.mode, 'embedded', 'The intended startup layout embeds video above the feed');
       await browser.$('[data-tmc-auth-login]').click();
       await browser.$('[data-tmc-auth-dialog]').waitForDisplayed();
       await browser.waitUntil(async () => (await readPlayback()).playerViews[0]?.bounds.width === 0);
