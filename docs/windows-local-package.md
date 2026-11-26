@@ -1,8 +1,8 @@
 # Local Windows package
 
 Local Windows artifacts are unsigned candidates, not published releases.
-The [1.1.0-rc.1 qualification plan](releases/1.1.0-rc.1.md) records the first
-stable release candidate scope, checks and publication boundary.
+The [1.1.0 final build plan](releases/1.1.0.md) records final qualification;
+the [RC record](releases/1.1.0-rc.1.md) retains candidate history and limits.
 Use Node 24.22.3 and bundled npm 11.19.1 on Windows x64.
 
 ```powershell
@@ -75,7 +75,10 @@ arguments. It creates a marked profile in ignored `.test-build/`, passes
 Electron's native `--user-data-dir` and starts from an empty working directory.
 Inherited TMC/Electron configuration is removed from child environments and
 backend/OAuth startup is directed to a local unused endpoint. No real login,
-synthetic credentials, chat connection or remote player is started.
+synthetic credentials, chat connection or remote player is started. Stable builds
+seed a recent-check timestamp in the owned profile, exercising actual daily
+cooldown on both launches without requesting public GitHub metadata. Separate
+main IPC tests cover cold-start scheduling with the HTTP boundary substituted.
 
 Checks cover the production ASAR file allowlist, configured security fuses,
 file-based UI/CSS/preload/IPC, empty accounts, first-launch login guidance, modal
