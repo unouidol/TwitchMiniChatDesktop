@@ -11,11 +11,11 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     executableName: 'TMC-desktop',
-    win32metadata: { ProductName: 'TMC desktop', FileDescription: 'TMC desktop chat client' },
+    win32metadata: { ProductName: 'TMC desktop (installata)', FileDescription: 'TMC desktop chat client' },
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ setupExe: 'TMC-desktop-Setup.exe' }),
+    new MakerSquirrel({ title: 'TMC desktop', setupExe: 'TMC-desktop-Setup.exe' }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),

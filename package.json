@@ -1,7 +1,7 @@
 {
   "name": "twitchminichatdesktop",
   "productName": "twitchminichatdesktop",
-  "version": "1.1.0-dev.18",
+  "version": "1.1.0-dev.19",
   "description": "TMC desktop chat client",
   "main": ".vite/build/main.js",
   "private": true,
@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc --project tsconfig.test.json && node --experimental-test-module-mocks --test tests/*.test.cjs",
     "test:e2e": "node tests/e2e/account-removal.mjs",
-    "test:packaged": "node tests/e2e/packaged-smoke.mjs"
+    "test:packaged": "node tests/e2e/packaged-smoke.mjs",
+    "test:squirrel": "node tests/e2e/squirrel-smoke.mjs"
   },
   "keywords": [],
   "author": {
@@ -32,7 +33,6 @@
     "@electron-forge/plugin-fuses": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron/fuses": "^1.8.0",
-    "@types/electron-squirrel-startup": "^1.0.2",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "electron": "43.0.0",
@@ -42,9 +42,6 @@
     "vite": "^5.4.21",
     "ws": "8.23.0",
     "webdriverio": "9.31.9"
-  },
-  "dependencies": {
-    "electron-squirrel-startup": "^1.0.1"
   },
   "allowScripts": {
     "electron-winstaller@5.4.4": true,
