@@ -1,6 +1,8 @@
 # Local Windows package
 
-This is an unsigned local development candidate, not a published release.
+Local Windows artifacts are unsigned candidates, not published releases.
+The [1.1.0-rc.1 qualification plan](releases/1.1.0-rc.1.md) records the first
+stable release candidate scope, checks and publication boundary.
 Use Node 24.22.3 and bundled npm 11.19.1 on Windows x64.
 
 ```powershell
