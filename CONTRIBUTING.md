@@ -47,6 +47,12 @@ automatic retry, live provider request or offline authentication is introduced.
 Unreadable encrypted storage is retained and cannot be silently overwritten by
 a later login; repair/recovery UI is separate work.
 
+Active-selection regressions restore two accounts in both orders and require the
+saved preference and compatibility authentication to agree after startup. They
+also check absent/stale preferences, failed preferred-account fallback and recovery
+after a fully failed startup. No intermediate restored account may overwrite the
+preference before the complete restore batch is available.
+
 `npm start` launches the application and can restore authenticated state; it is
 not an automated check. Backend/OAuth setup needs suitable development
 configuration. Never attach credentials to issues or test fixtures.
@@ -100,6 +106,27 @@ the currently selected account. No such manual result is claimed here.
 The mocked unit tests do not verify OS-backed encryption, the running renderer, real login,
 broader account switching, or PCG panel/resource behavior.
 
+Manual check on 2026-11-17: normal development startup while online opened the
+main window, and the user confirmed an active saved account. After closing the
+app and restarting it online with the same profile, the user confirmed that the
+account was active without another login. The user then confirmed that Refresh
+history completed without errors on the current channel, exercising the restored
+session against the history endpoint. The user subsequently completed a second
+real-account login and confirmed two distinct accounts in the Accounts menu.
+The user confirmed A-to-B-to-A switching with matching status, both accounts
+remaining available, and no new login requested. After closing with A selected
+and restarting online, both accounts were available without login, but B was
+active: credential retention passed; persistence of the selected account failed.
+An isolated synthetic registry probe reproduced the selection loss before account
+restoration and replacement of the preference by the first restored account.
+After the active-selection correction, the user selected A, waited for matching
+status, closed the app and restarted online. The user confirmed that A remained
+active, both accounts were present and no new login was requested. This manually
+verifies the corrected development build's saved selection across restart.
+The offline-startup and subsequent online-recovery check is deferred because the network cannot be
+disconnected during this session. These observations do not establish offline
+retention, real-account removal, or PCG retention/resource behavior.
+
 ## Electron E2E (synthetic)
 
 On Windows x64 with Node 24.18.0 and PowerShell 7, install dependencies with
@@ -109,7 +136,9 @@ under ignored `.test-build/electron-e2e/`. This command is intentionally separat
 from `npm test` and runs in its own CI job. Maintained E2E `.mjs` and `.ts` files receive
 Node-specific ESLint coverage, with no diagnostic suppressions.
 
-The scenario seeds synthetic B/A through the production secure store, selects A
+The scenario seeds synthetic B/A through the production secure store, saves a
+preference for the account that will restore last, and verifies the actual restore
+order plus the initial UI selection/status. It then selects A
 and confirms removal using the real UI, closes Electron, waits for process exit,
 then starts a new process on the same temporary profile. It asserts that only B
 is restored, its synthetic credential is unchanged, selection/display agree, and

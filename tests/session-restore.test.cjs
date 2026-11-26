@@ -46,6 +46,7 @@ const { registerIpcHandlers } = require('../.test-build/main/ipc/registerIpcHand
 const { TmcSecureAuthSessionStore } = require('../.test-build/main/auth/TmcSecureAuthSessionStore.js');
 const { TmcAuthBrokerClient, TmcDesktopSessionRestoreError } = require('../.test-build/main/auth/TmcAuthBrokerClient.js');
 const { TmcAuthSessionStore } = require('../.test-build/main/auth/TmcAuthSessionStore.js');
+const { TmcActiveAccountStore } = require('../.test-build/main/accounts/TmcActiveAccountStore.js');
 const { TMC_IPC_CHANNELS: channels } = require('../.test-build/shared/ipc/IpcChannels.js');
 const config = {
   backendBaseUrl: 'https://backend.invalid', desktopClientId: 'restore-test',
@@ -164,6 +165,87 @@ test('one failed account does not prevent another from restoring or erase either
   for (const saved of await store.loadSessions()) {
     assert.equal(saved.desktopSessionToken, session(saved.profileId).desktopSessionToken);
   }
+});
+
+for (const preferred of ['A', 'B']) {
+  test(`saved selection ${preferred} survives both restore orders and is persisted only after restore completes`, async (context) => {
+    const other = preferred === 'A' ? 'B' : 'A';
+    let clock = 1_000_000;
+    context.mock.method(Date, 'now', () => ++clock);
+    const store = await seed([preferred, other]);
+    const preference = new TmcActiveAccountStore();
+    await preference.saveActiveProfileId(preferred);
+    const writes = [];
+    const savePreference = TmcActiveAccountStore.prototype.saveActiveProfileId;
+    context.mock.method(TmcActiveAccountStore.prototype, 'saveActiveProfileId', async function (id) {
+      writes.push(id);
+      return savePreference.call(this, id);
+    });
+    for (const order of [[other, preferred], [preferred, other]]) {
+      requests.length = 0;
+      writes.length = 0;
+      const result = await initialize();
+      assert.deepEqual(requests, order, 'Exercise both actual restore orders');
+      assert.equal(result.activeProfileId, preferred);
+      assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, preferred);
+      assert.equal(await preference.loadActiveProfileId(), preferred);
+      assert.deepEqual(writes, [preferred], 'No intermediate fallback may overwrite the preference');
+      assert.deepEqual(result.accounts.map((account) => account.profileId).sort(), ['A', 'B']);
+      for (const saved of await store.loadSessions()) {
+        assert.equal(saved.desktopSessionToken, session(saved.profileId).desktopSessionToken);
+      }
+    }
+  });
+}
+
+for (const preferred of [null, 'removed-account']) {
+  test(`a ${preferred === null ? 'missing' : 'stale'} preference selects a restored account after the restore batch`, async (context) => {
+    await seed(['A', 'B']);
+    const preference = new TmcActiveAccountStore();
+    if (preferred) await preference.saveActiveProfileId(preferred);
+    const writes = [];
+    const savePreference = TmcActiveAccountStore.prototype.saveActiveProfileId;
+    context.mock.method(TmcActiveAccountStore.prototype, 'saveActiveProfileId', async function (id) {
+      writes.push(id);
+      return savePreference.call(this, id);
+    });
+    const result = await initialize();
+    assert.ok(['A', 'B'].includes(result.activeProfileId));
+    assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, result.activeProfileId);
+    assert.equal(await preference.loadActiveProfileId(), result.activeProfileId);
+    assert.deepEqual(writes, [result.activeProfileId]);
+  });
+}
+
+test('an unavailable preferred account falls back to another restored account without deleting credentials', async () => {
+  const store = await seed(['A', 'B']);
+  const preference = new TmcActiveAccountStore();
+  await preference.saveActiveProfileId('A');
+  restore = async (id) => {
+    if (id === 'A') throw new TypeError('Controlled preferred-account failure');
+    return response(id);
+  };
+  expectedWarnings.push(restoreWarning('unavailable'));
+  const result = await initialize();
+  assert.equal(result.activeProfileId, 'B');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'B');
+  assert.equal(await preference.loadActiveProfileId(), 'B');
+  assert.deepEqual((await store.loadSessions()).map((saved) => saved.profileId).sort(), ['A', 'B']);
+});
+
+test('a fully failed startup retains the preference for a later successful restart', async () => {
+  const store = await seed(['A', 'B']);
+  const preference = new TmcActiveAccountStore();
+  await preference.saveActiveProfileId('A');
+  restore = async () => { throw new TypeError('Controlled offline startup'); };
+  expectedWarnings.push(restoreWarning('unavailable'), restoreWarning('unavailable'));
+  await initialize();
+  await assertSignedOut();
+  assert.equal(await preference.loadActiveProfileId(), 'A');
+  assert.deepEqual((await store.loadSessions()).map((saved) => saved.profileId).sort(), ['A', 'B']);
+  restore = async (id) => response(id);
+  assert.equal((await initialize()).activeProfileId, 'A');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'A');
 });
 
 test('restore timeout is passed to the actual request and retains saved authentication', async (context) => {
