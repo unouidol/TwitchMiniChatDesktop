@@ -28,6 +28,10 @@ let browserAttempts = 0;
 const linkAttempts: string[] = [];
 shell.openExternal = async (target: string): Promise<void> => {
   const url = new URL(target);
+  if (['https://tmc.ircminichat.party/', 'https://discord.gg/E8yRUp2MBK', 'https://ko-fi.com/tmc_app',
+    'https://github.com/unouidol/TwitchMiniChatDesktop/releases/download/v99.0.0/TMC-desktop-Setup.exe'].includes(target)) {
+    fs.appendFileSync(path.join(root, 'project-link-attempts.txt'), `${target}\n`); return;
+  }
   if (url.hostname === 'example.test') {
     assert.ok([
       'https://example.test/history?x=1&y=2', 'http://example.test/live',

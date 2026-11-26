@@ -9,6 +9,7 @@ import { initializeReplyComposer } from '../chat/initializeReplyComposer';
 import { initializeChatCompletion } from '../chat/initializeChatCompletion';
 import { initializeChatAppearance } from '../chat/initializeChatAppearance';
 import { initializeLivePlayer } from '../player/initializeLivePlayer';
+import { initializeWelcome } from '../welcome/initializeWelcome';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
 //import { initializePcgSessionPanel } from '../pcg/initializePcgSessionPanel';
 
@@ -110,6 +111,8 @@ export async function bootstrapRenderer(): Promise<void> {
     }
   });
 
+  const welcome = initializeWelcome(tmc);
+  window.addEventListener('pagehide', () => welcome.dispose(), { once: true });
   await chatController.initialize();
 }
 

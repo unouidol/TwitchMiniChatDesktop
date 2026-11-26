@@ -22,7 +22,7 @@ global.WebSocket = class {
 mock.module('electron', {
   cache: true,
   exports: {
-    app: { getPath: () => userDataPath },
+    app: { getPath: () => userDataPath, getVersion: () => '1.1.0-test', isPackaged: false, once() {} },
     ipcMain: {
       handle: (channel, handler) => {
         assert.equal(handlers.has(channel), false, `Duplicate handler: ${channel}`);

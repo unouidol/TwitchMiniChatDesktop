@@ -5,6 +5,7 @@ import {
 } from '../chat/TmcChannelChatController';
 import type { TmcPcgStatus } from '../../shared/pcg/TmcPcgModels';
 import { TMC_AUTH_DIALOG_CHANGED_EVENT } from '../auth/initializeAuthPanel';
+import { isLocalDialogVisible } from '../dialogs/TmcLocalDialog';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
 
 const MIN_PCG_VIEW_SIZE = 20;
@@ -85,9 +86,8 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     };
 
     try {
-      const loginDialog = document.querySelector<HTMLDialogElement>('[data-tmc-auth-dialog]');
       const accountMenu = document.querySelector<HTMLDetailsElement>('[data-tmc-account-menu]');
-      if (menu?.open || accountMenu?.open || loginDialog?.open || loginDialog?.dataset.opening === 'true' ||
+      if (menu?.open || accountMenu?.open || isLocalDialogVisible() ||
           bounds.width <= MIN_PCG_VIEW_SIZE || bounds.height <= MIN_PCG_VIEW_SIZE) {
         await tmc.pcg.hideView();
         return;

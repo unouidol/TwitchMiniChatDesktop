@@ -41,9 +41,11 @@
                 <button type="button" class="tmc-remove-account-button" data-tmc-remove-local-account disabled>
                   Remove account…
                 </button>
+                <button type="button" class="tmc-button tmc-button-secondary" data-tmc-welcome-open>About TMC</button>
               </div>
             </details>
           </section>
+          <p class="tmc-muted" role="status" data-tmc-welcome-error hidden></p>
 
 
         </div>
@@ -287,6 +289,32 @@
     </dialog>
 
 
+    <dialog class="tmc-welcome-dialog" aria-labelledby="tmc-welcome-title" data-tmc-welcome-dialog>
+      <div class="tmc-welcome-content">
+        <span class="tmc-section-kicker">Welcome</span>
+        <h2 id="tmc-welcome-title">Welcome to TMC desktop</h2>
+        <p data-tmc-welcome-version></p>
+        <p>Follow your channels, chat with multiple accounts and use PCG in one place.</p>
+        <p>Start with <strong>Login</strong>, then open a channel from the sidebar. PCG has its own Twitch sign-in.</p>
+        <p>Join the community for news and help. Report problems on Discord in <strong>#tmc-ticket</strong>.</p>
+        <div class="tmc-welcome-actions">
+          <button type="button" class="tmc-button tmc-button-secondary" data-tmc-project-link="website">TMC website</button>
+          <button type="button" class="tmc-button tmc-button-secondary" data-tmc-project-link="discord">Join Discord</button>
+          <button type="button" class="tmc-button tmc-button-secondary" data-tmc-project-link="support">Support TMC on Ko-fi</button>
+        </div>
+        <section class="tmc-welcome-updates" aria-label="Windows updates">
+          <h3>Updates</h3>
+          <p role="status" aria-live="polite" data-tmc-welcome-status></p>
+          <p class="tmc-muted">The check contacts GitHub, which receives your IP address and request time. No account or session tokens are sent. Downloads open in your browser; nothing installs automatically.</p>
+          <div class="tmc-welcome-actions">
+            <button type="button" class="tmc-button tmc-button-secondary" data-tmc-welcome-check>Check for updates</button>
+            <button type="button" class="tmc-button" data-tmc-project-link="download" data-tmc-welcome-download hidden>Download Windows update</button>
+          </div>
+        </section>
+        <p class="tmc-muted">Open this page again from the ••• menu → About TMC.</p>
+        <button type="button" class="tmc-button" data-tmc-welcome-close>Continue</button>
+      </div>
+    </dialog>
     <script type="module" src="/src/renderer.ts"></script>
   </body>
 </html>

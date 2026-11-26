@@ -6,6 +6,11 @@ The maintainer remains responsible for reviewing and accepting each change.
 
 ## Local setup and checks
 
+Welcome/update tests and the public GitHub/site contract are documented in
+[welcome and updates](docs/welcome-and-updates.md). Synthetic UI tests replace
+only release-metadata transport with local HTTP; automated tests must not query
+GitHub or download/install a release. New checks retain the existing network guards.
+
 Player unit tests exercise the actual loopback source's path/channel validation,
 CSP, retired documents and listener closure, plus manager ownership with Electron
 boundaries substituted: reparenting versus destruction, memory-session cleanup,

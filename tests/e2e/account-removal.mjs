@@ -184,6 +184,10 @@ async function launch(phase) {
     return false;
   }, { timeout: 20000, timeoutMsg: 'Production renderer window must be present' });
   await browser.$('[data-tmc-account-select]').waitForEnabled({ timeout: 20000 });
+  await browser.$('[data-tmc-welcome-dialog]').waitForDisplayed({ timeout: 20000 });
+  assert.equal(await browser.$('[data-tmc-welcome-download]').isDisplayed(), phase !== 'first', 'Download appears only for a known newer desktop installer');
+  await browser.saveScreenshot(path.join(evidence, `welcome-${phase}.png`));
+  await browser.$('[data-tmc-welcome-close]').click();
   return report;
 }
 
@@ -215,6 +219,11 @@ try {
         const boundary = 'https://player.twitch.tv';
         assert.equal(code.split(boundary).length, 2, 'Only the official player frame HTTP origin is substituted');
         return code.replace(boundary, `${fixture.origin}/player-frame`);
+      } }, { name: 'local-desktop-release', transform(code, id) {
+        if (!id.replaceAll('\\', '/').endsWith('/src/main/welcome/TmcReleaseClient.ts')) return;
+        const boundary = 'https://api.github.com/repos/unouidol/TwitchMiniChatDesktop/releases/latest';
+        assert.equal(code.split(boundary).length, 2, 'Only the public release metadata HTTP boundary is substituted');
+        return code.replace(boundary, `${fixture.origin}/desktop-release`);
       } }, { name: 'reject-real-config', resolveId(source) {
         if (source.endsWith('/TmcRuntimeConfig') || source.includes('LocalPropertiesReader')) {
           throw new Error('E2E bootstrap must not import real runtime configuration');
@@ -266,6 +275,9 @@ try {
   await exerciseBadges(browser, fixture, evidence, readNativeViews);
   await exerciseSearch(browser, fixture, evidence, readNativeViews);
   await exercisePlayer(browser, fixture, evidence, readNativeViews, readPlayback, resizeOwnedWindow, closeOwnedPlayerWindow);
+  const projectLinks = (await fs.readFile(path.join(root, 'project-link-attempts.txt'), 'utf8')).trim().split('\n');
+  assert.deepEqual(projectLinks, ['https://github.com/unouidol/TwitchMiniChatDesktop/releases/download/v99.0.0/TMC-desktop-Setup.exe']);
+  await fs.writeFile(path.join(evidence, 'welcome-browser.json'), JSON.stringify({ intercepted: projectLinks }, null, 2));
   await fs.writeFile(path.join(evidence, 'player-lifecycle.json'), JSON.stringify(await readPlayback(), null, 2));
   await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
   await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-a'),

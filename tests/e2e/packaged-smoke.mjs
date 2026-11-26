@@ -98,6 +98,13 @@ async function launch() {
   const pid = application.pid;
   assert.ok(Number.isSafeInteger(pid) && pid > 0, 'Actual owned packaged process identity');
   await browser.waitUntil(async () => (await browser.getUrl()).includes('/app.asar/.vite/renderer/main_window/index.html'), { timeout: 20000 });
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-welcome-open]').getAttribute('data-ready')) === 'true');
+  if (!result.launches.length) {
+    await browser.$('[data-tmc-welcome-dialog]').waitForDisplayed();
+    assert.equal(await browser.$('[data-tmc-welcome-download]').isDisplayed(), false);
+    await browser.saveScreenshot(path.join(root, 'welcome-packaged.png'));
+    await browser.$('[data-tmc-welcome-close]').click();
+  } else assert.equal(await browser.$('[data-tmc-welcome-dialog]').isDisplayed(), false, 'Welcome does not repeat at the same version');
   await browser.$('[data-tmc-auth-login]').waitForClickable({ timeout: 15000 });
   const state = await browser.executeAsync((done) => {
     const shell = globalThis.window;

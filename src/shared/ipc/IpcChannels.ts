@@ -9,6 +9,10 @@ export const TMC_IPC_CHANNELS = {
    * Diagnostic ping from the renderer to the main process.
    */
   appPing: 'tmc:app:ping',
+  WELCOME_START: 'tmc:welcome:start',
+  WELCOME_GET: 'tmc:welcome:get',
+  WELCOME_CHECK: 'tmc:welcome:check',
+  WELCOME_CHANGED: 'tmc:welcome:changed',
   EMOTE_CATALOG: 'tmc:emotes:catalog',
   CHAT_USER_COLORS: 'tmc:chat:user-colors',
   CHAT_OPEN_LINK: 'tmc:chat:open-link',

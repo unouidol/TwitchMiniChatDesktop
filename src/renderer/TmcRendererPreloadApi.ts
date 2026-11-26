@@ -5,6 +5,7 @@ import type {
   TmcSetActiveAccountRequest,
 } from '../shared/accounts/TmcAccountModels';
 import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
+import type { TmcWelcomeApi } from '../shared/app/TmcWelcome';
 import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
 import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
 import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
@@ -52,6 +53,7 @@ import type {
  * Renderer-side view of the safe preload bridge.
  */
 export type TmcRendererPreloadApi = {
+  readonly welcome: TmcWelcomeApi;
   readonly emotes: { readonly getCatalog: (request: TmcEmoteCatalogRequest) => Promise<TmcEmoteCatalog> };
   /**
    * Returns basic application information for the local UI.

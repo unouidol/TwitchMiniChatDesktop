@@ -32,6 +32,7 @@ import { registerBadgeIpcHandlers } from './registerBadgeIpcHandlers';
 import { TmcPlayerManager } from '../player/TmcPlayerManager';
 import { registerPlayerIpcHandlers } from './registerPlayerIpcHandlers';
 import { JsonFileStore } from '../storage/JsonFileStore';
+import { registerWelcomeIpcHandlers } from './registerWelcomeIpcHandlers';
 import path from 'node:path';
 
 /**
@@ -44,6 +45,7 @@ import path from 'node:path';
 export async function registerIpcHandlers(
   runtimeConfig: TmcRuntimeConfig,
 ): Promise<{ player: TmcPlayerManager }> {
+  registerWelcomeIpcHandlers();
   const authSessionStore = new TmcAuthSessionStore();
   const secureAuthSessionStore = new TmcSecureAuthSessionStore();
   const accountRegistry = new TmcAccountSessionRegistry(

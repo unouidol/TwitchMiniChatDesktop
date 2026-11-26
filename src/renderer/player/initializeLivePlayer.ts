@@ -2,6 +2,7 @@ import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
 import type { TmcPlayerBounds, TmcPlayerContext, TmcPlayerMode, TmcPlayerStatus } from '../../shared/player/TmcPlayerModels';
 import { TMC_ACCOUNT_CHANGED_EVENT, TMC_ACCOUNT_MENU_CHANGED_EVENT } from '../accounts/initializeAccountSwitcher';
 import { TMC_AUTH_DIALOG_CHANGED_EVENT } from '../auth/initializeAuthPanel';
+import { isLocalDialogVisible } from '../dialogs/TmcLocalDialog';
 import { TMC_AUTH_LOGGED_IN_EVENT, TMC_CHANNEL_CHANGED_EVENT } from '../chat/TmcChannelChatController';
 
 /** Measures the local host only; main owns playback and its lifetime. */
@@ -37,7 +38,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
     return Math.floor(chat.getBoundingClientRect().height - other - 180 - overhead);
   };
   const bounds = (): TmcPlayerBounds | null => {
-    if (document.querySelector('[data-tmc-auth-dialog][open], [data-tmc-auth-dialog][data-opening="true"], [data-tmc-account-menu][open]')) return null;
+    if (isLocalDialogVisible() || document.querySelector('[data-tmc-account-menu][open]')) return null;
     const rect = host.getBoundingClientRect();
     const value = { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.floor(rect.width), height: Math.floor(rect.height) };
     return value.width >= 400 && value.height >= 300 && value.x >= 0 && value.y >= 0 && value.x + value.width <= innerWidth && value.y + value.height <= innerHeight ? value : null;
@@ -131,7 +132,7 @@ export function initializeLivePlayer(tmc: TmcRendererPreloadApi, channel: () => 
   };
   const changedContext = (): void => { if (requested) void activate(); else schedule(); };
   const occlusionChanged = (): void => {
-    const hidden = !!document.querySelector('[data-tmc-auth-dialog][open], [data-tmc-auth-dialog][data-opening="true"], [data-tmc-account-menu][open]');
+    const hidden = isLocalDialogVisible() || !!document.querySelector('[data-tmc-account-menu][open]');
     void tmc.player.occlude({ hidden }).then(schedule).catch(() => {
       if (requested && !lifetime.signal.aborted) showError('Could not update player visibility. Close it and try again.');
     });
