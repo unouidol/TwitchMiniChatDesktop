@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: '24.18.0'
+          node-version: '24.22.3'
           package-manager-cache: false
 
       - name: Install dependencies
@@ -58,15 +58,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: '24.18.0'
+          node-version: '24.22.3'
           package-manager-cache: false
 
       - name: Record runtime
         run: |
           $nodeVersion = node --version
-          if ($LASTEXITCODE -ne 0 -or $nodeVersion -ne 'v24.18.0') { throw 'Unexpected Node runtime' }
+          if ($LASTEXITCODE -ne 0 -or $nodeVersion -ne 'v24.22.3') { throw 'Unexpected Node runtime' }
           $npmVersion = npm --version
-          if ($LASTEXITCODE -ne 0 -or $npmVersion -ne '11.16.0') { throw 'Unexpected bundled npm' }
+          if ($LASTEXITCODE -ne 0 -or $npmVersion -ne '11.19.1') { throw 'Unexpected bundled npm' }
           Write-Output "Node $nodeVersion; npm $npmVersion"
 
       - name: Install dependencies

@@ -106,12 +106,12 @@ async function launch() {
     await browser.$('[data-tmc-welcome-close]').click();
   } else assert.equal(await browser.$('[data-tmc-welcome-dialog]').isDisplayed(), false, 'Welcome does not repeat at the same version');
   await browser.$('[data-tmc-auth-login]').waitForClickable({ timeout: 15000 });
-  const state = await browser.executeAsync((done) => {
+  const state = await browser.execute(async () => {
     const shell = globalThis.window;
-    Promise.all([shell.tmc.ping(), shell.tmc.accounts.list(), shell.tmc.settings.get(), shell.tmc.player.getStatus()]).then(
-      ([ping, accounts, settings, player]) => done({ ping, accounts, settings, player, node: typeof shell.require, process: typeof shell.process,
+    return Promise.all([shell.tmc.ping(), shell.tmc.accounts.list(), shell.tmc.settings.get(), shell.tmc.player.getStatus()]).then(
+      ([ping, accounts, settings, player]) => ({ ping, accounts, settings, player, node: typeof shell.require, process: typeof shell.process,
         styles: shell.getComputedStyle(shell.document.querySelector('.tmc-shell')).display }),
-      (error) => done({ error: String(error) }));
+      (error) => ({ error: String(error) }));
   });
   assert.equal(state.error, undefined); assert.equal(state.ping, 'pong');
   assert.equal(state.node, 'undefined'); assert.equal(state.process, 'undefined');
@@ -142,7 +142,7 @@ try {
   assert.equal(await browser.$('[data-tmc-auth-code-step]').isDisplayed(), false);
   await browser.$('[data-tmc-auth-close]').click();
   await browser.saveScreenshot(path.join(root, 'packaged-window.png'));
-  assert.equal(await browser.executeAsync((done) => globalThis.window.tmc.settings.setChatAppearance({ fontSize: 18, density: 'compact', showTimestamps: false }).then(() => done(true), () => done(false))), true);
+  assert.equal(await browser.execute(async () => globalThis.window.tmc.settings.setChatAppearance({ fontSize: 18, density: 'compact', showTimestamps: false }).then(() => true, () => false)), true);
   const saved = JSON.parse(await fs.readFile(path.join(profile, 'settings.json'), 'utf8'));
   assert.equal(saved.chatAppearance.fontSize, 18, 'Preferences are written in the isolated profile');
   await close();

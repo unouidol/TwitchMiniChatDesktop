@@ -1,7 +1,7 @@
 # Local Windows package
 
 This is an unsigned local development candidate, not a published release.
-Use Node 24.18.0 and bundled npm 11.16.0 on Windows x64.
+Use Node 24.22.3 and bundled npm 11.19.1 on Windows x64.
 
 ```powershell
 npm run make -- --platform=win32 --arch=x64

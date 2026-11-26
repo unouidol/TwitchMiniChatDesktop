@@ -27,7 +27,7 @@ export function createMainWindow(): BrowserWindow {
     title: 'TMC desktop',
     backgroundColor: '#111827',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,

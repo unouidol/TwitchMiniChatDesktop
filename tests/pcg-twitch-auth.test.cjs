@@ -172,3 +172,60 @@ test('late panel activation cannot attach B browser-session evidence to A', asyn
     assert.equal(manager.getStatus().twitchAuth, 'session-present');
   } finally { FakeContents.prototype.loadURL = original; }
 });
+
+test('duplicate pending and ready PCG activation navigates once and retains its view', async (context) => {
+  const load = deferred();
+  const calls = [];
+  context.mock.method(FakeContents.prototype, 'loadURL', function (url) {
+    this.url = url; calls.push(url); return load.promise;
+  });
+  const manager = makeManager();
+  const first = manager.activate('A', 'channel');
+  const second = manager.activate(' A ', '#channel');
+  assert.equal(calls.length, 1, 'Account/channel notifications share the actual navigation');
+  assert.equal(manager.getStatus().state, 'loading');
+  load.resolve();
+  const results = await Promise.all([first, second]);
+  assert.ok(results.every((status) => status.state === 'active' && status.profileId === 'A'));
+  await manager.activate('A', 'channel');
+  assert.equal(calls.length, 1, 'The already loaded exact context is retained');
+  assert.equal(views.length, 1);
+});
+
+test('shared PCG load failure remains an error, including aborts, and a later activation can retry', async (context) => {
+  const load = deferred();
+  let calls = 0;
+  context.mock.method(FakeContents.prototype, 'loadURL', function (url) {
+    this.url = url; calls++; return calls === 1 ? load.promise : Promise.resolve();
+  });
+  const manager = makeManager();
+  const first = manager.activate('A', 'channel');
+  const second = manager.activate('A', 'channel');
+  load.reject(Object.assign(new Error('Controlled ERR_ABORTED'), { code: 'ERR_ABORTED', errno: -3 }));
+  for (const status of await Promise.all([first, second])) {
+    assert.equal(status.state, 'error');
+    assert.equal(status.message, 'Controlled ERR_ABORTED');
+  }
+  assert.equal(calls, 1);
+  assert.equal((await manager.activate('A', 'channel')).state, 'active');
+  assert.equal(calls, 2);
+});
+
+test('a superseded shared PCG navigation cannot change the newer account or channel', async (context) => {
+  const older = deferred();
+  let calls = 0;
+  context.mock.method(FakeContents.prototype, 'loadURL', function (url) {
+    this.url = url; return ++calls === 1 ? older.promise : Promise.resolve();
+  });
+  const manager = makeManager();
+  const first = manager.activate('A', 'channel');
+  const second = manager.activate('A', 'channel');
+  await manager.activate('B', 'other');
+  const newer = manager.getStatus();
+  older.reject(new Error('Old navigation aborted'));
+  await Promise.all([first, second]);
+  assert.deepEqual(manager.getStatus(), newer);
+  assert.equal(newer.profileId, 'B');
+  assert.equal(newer.channel, 'other');
+  assert.equal(calls, 2);
+});

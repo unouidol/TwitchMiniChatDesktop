@@ -37,7 +37,7 @@ These instructions apply to the entire Electron/TypeScript repository.
 
 ## Verification and handoff
 
-- Use Node 24.18.0 and bundled npm 11.16.0. Run `npm test`,
+- Use Node 24.22.3 and bundled npm 11.19.1. Run `npm test`,
   `npm run typecheck`, `npm run lint`, and `git diff --check` as appropriate.
   Lint enforces zero warnings and unused-disable errors, but excludes CJS tests.
 - Run `npm run test:e2e` for the Windows synthetic Electron UI/restart scenario.

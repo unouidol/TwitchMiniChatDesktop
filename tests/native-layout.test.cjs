@@ -8,7 +8,7 @@ test('native layout waits for selected identity and current bounds and compares 
     selected: 'A', channel: 'channel', auth: 'signed-out', bounds: { height: 360, width: 313, x: 816, y: 291 } };
   let reads = 0;
   const browser = {
-    async executeAsync() { return { ...state, selected: reads === 0 ? 'B' : 'A' }; },
+    async execute() { return { ...state, selected: reads === 0 ? 'B' : 'A' }; },
     async waitUntil(predicate) {
       assert.equal(await predicate(), false, 'An old account snapshot is never accepted');
       assert.equal(await predicate(), false, 'One matching observation is insufficient');
@@ -22,7 +22,7 @@ test('native layout rejects pending authentication and genuine geometry changes 
   const { settledNativeViews } = await import('./e2e/native-layout.mjs');
   let pending = true;
   const browser = {
-    async executeAsync() { return { status: { profileId: 'A', channel: 'channel', state: 'active', displayMode: 'embedded', twitchAuth: pending ? 'unknown' : 'signed-out' },
+    async execute() { return { status: { profileId: 'A', channel: 'channel', state: 'active', displayMode: 'embedded', twitchAuth: pending ? 'unknown' : 'signed-out' },
       selected: 'A', channel: 'channel', auth: pending ? 'unknown' : 'signed-out', bounds: { x: 1, y: 2, width: 100, height: 200 } }; },
     async waitUntil(predicate) {
       assert.equal(await predicate(), false);

@@ -3,15 +3,15 @@ export async function settledNativeViews(browser, readNativeViews) {
   let settled;
   let previous;
   await browser.waitUntil(async () => {
-    const state = await browser.executeAsync((done) => {
-      globalThis.window.tmc.pcg.getStatus().then((status) => {
+    const state = await browser.execute(async () => {
+      return globalThis.window.tmc.pcg.getStatus().then((status) => {
         const document = globalThis.document;
         const host = document.querySelector('#pcgHost').getBoundingClientRect();
-        done({ status, selected: document.querySelector('[data-tmc-account-select]').value,
+        return { status, selected: document.querySelector('[data-tmc-account-select]').value,
           channel: document.querySelector('#chatChannelLabel').textContent.slice(1),
           auth: document.querySelector('.tmc-pcg-panel').dataset.tmcPcgTwitchAuth,
-          bounds: { x: Math.round(host.x), y: Math.round(host.y), width: Math.round(host.width), height: Math.round(host.height) } });
-      }, () => done(null));
+          bounds: { x: Math.round(host.x), y: Math.round(host.y), width: Math.round(host.width), height: Math.round(host.height) } };
+      }, () => null);
     });
     const views = await readNativeViews();
     const valid = state && state.status.profileId === state.selected && state.status.channel === state.channel &&

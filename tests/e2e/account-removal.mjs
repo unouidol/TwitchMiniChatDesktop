@@ -89,7 +89,8 @@ async function readPlayback() {
 }
 async function closeOwnedPlayerWindow() {
   const command = path.join(root, 'first-close-player');
-  await fs.writeFile(command, 'close-owned-detached-player', { flag: 'wx' });
+  await fs.writeFile(`${command}.tmp`, 'close-owned-detached-player', { flag: 'wx' });
+  await fs.rename(`${command}.tmp`, command);
   await waitFor(async () => {
     try { await fs.access(`${command}.ack`); return true; }
     catch (error) { if (error.code === 'ENOENT') return false; throw error; }
@@ -101,7 +102,9 @@ async function closeOwnedPlayerWindow() {
 async function resizeOwnedWindow(width, height) {
   const sequence = ++windowSizeSequence;
   const command = path.join(root, `first-window-size-${sequence}.json`);
-  await fs.writeFile(command, JSON.stringify({ width, height }), { flag: 'wx' });
+  // Electron polls for this name; publish it only after the entire payload closes.
+  await fs.writeFile(`${command}.tmp`, JSON.stringify({ width, height }), { flag: 'wx' });
+  await fs.rename(`${command}.tmp`, command);
   const acknowledgement = path.join(root, `first-window-size-${sequence}.ack.json`);
   await waitFor(async () => {
     try { await fs.access(acknowledgement); return true; }
@@ -211,7 +214,7 @@ try {
     outDir: path.join(output, 'build'),
     emptyOutDir: false,
     lib: { entry: path.join(project, 'tests/e2e/bootstrap.ts'), formats: ['cjs'], fileName: () => 'main.cjs' },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['electron', ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
       output: { inlineDynamicImports: true },
       plugins: [{ name: 'local-player-frame', enforce: 'pre', transform(code, id) {
@@ -233,8 +236,8 @@ try {
   } });
   await build({ ...shared, build: {
     outDir: path.join(output, 'build'), emptyOutDir: false,
-    lib: { entry: path.join(project, 'src/preload.ts'), formats: ['cjs'], fileName: () => 'preload.js' },
-    rollupOptions: { external: ['electron'] },
+    lib: { entry: path.join(project, 'src/preload.ts'), formats: ['cjs'], fileName: () => 'preload.cjs' },
+    rolldownOptions: { external: ['electron'] },
   } });
   await build({ configFile: false, envFile: false, root: project, base: './',
     plugins: [appVersionPlugin('e2e')],
@@ -323,10 +326,10 @@ try {
   assert.deepEqual(fixture.requests.filter((entry) => entry.phase === 'restart' && entry.path === '/restore')
     .map((entry) => entry.profileId), ['B']);
   await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected', { timeout: 20000 });
-  const restartedFavorites = await browser.executeAsync((done) => {
-    globalThis.window.tmc.emotes.getCatalog({ profileId: 'B', channel: 'fixture-channel' }).then(
-      (catalog) => done({ favorites: catalog.favorites.map((emote) => emote.name), failed: catalog.favoritesSaveFailed }),
-      () => done({ failed: true }),
+  const restartedFavorites = await browser.execute(async () => {
+    return globalThis.window.tmc.emotes.getCatalog({ profileId: 'B', channel: 'fixture-channel' }).then(
+      (catalog) => ({ favorites: catalog.favorites.map((emote) => emote.name), failed: catalog.favoritesSaveFailed }),
+      () => ({ failed: true }),
     );
   });
   assert.deepEqual(restartedFavorites, { favorites: ['Kappa', 'Keepo'], failed: false }, 'Fresh Electron process restores only B favorites');
