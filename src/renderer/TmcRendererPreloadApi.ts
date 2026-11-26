@@ -8,6 +8,7 @@ import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
 import type { TmcWelcomeApi } from '../shared/app/TmcWelcome';
 import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
 import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
+import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
 import type { TmcPlayerContext, TmcPlayerLayoutRequest, TmcPlayerMode, TmcPlayerOpenRequest, TmcPlayerStatus } from '../shared/player/TmcPlayerModels';
 
 import type {
@@ -150,6 +151,7 @@ export type TmcRendererPreloadApi = {
   /**
    * Settings operations available to the local UI.
    */
+  readonly badges: { readonly getCatalog: (request: TmcBadgeRequest) => Promise<TmcBadgeCatalog> };
   readonly player: {
     readonly occlude: (request: { hidden: boolean }) => Promise<void>;
     readonly open: (request: TmcPlayerOpenRequest) => Promise<TmcPlayerStatus>;

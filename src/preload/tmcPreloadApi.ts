@@ -14,6 +14,7 @@ import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
 import type { TmcWelcomeSnapshot, TmcWelcomeApi } from '../shared/app/TmcWelcome';
 import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
 import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
+import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
 import type { TmcPlayerContext, TmcPlayerLayoutRequest, TmcPlayerMode, TmcPlayerOpenRequest, TmcPlayerStatus } from '../shared/player/TmcPlayerModels';
 import type {
   FinalizeTwitchLoginRequest,
@@ -346,6 +347,7 @@ export type TmcPreloadApi = {
    * Settings operations available to the local UI.
    */
   readonly settings: TmcSettingsPreloadApi;
+  readonly badges: { readonly getCatalog: (request: TmcBadgeRequest) => Promise<TmcBadgeCatalog> };
   readonly player: {
     readonly occlude: (request: { hidden: boolean }) => Promise<void>;
     readonly open: (request: TmcPlayerOpenRequest) => Promise<TmcPlayerStatus>;
@@ -736,6 +738,7 @@ function createTmcPreloadApi(): TmcPreloadApi {
       },
     },
 
+    badges: { getCatalog: (request: TmcBadgeRequest): Promise<TmcBadgeCatalog> => ipcRenderer.invoke(TMC_IPC_CHANNELS.CHAT_BADGES, request) },
     player: {
       occlude: (request: { hidden: boolean }): Promise<void> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_OCCLUDE, request),
       open: (request: TmcPlayerOpenRequest): Promise<TmcPlayerStatus> => ipcRenderer.invoke(TMC_IPC_CHANNELS.PLAYER_OPEN, request),
