@@ -303,9 +303,15 @@ export class TmcChannelChatController {
     clearChatList();
     this.renderedMessageKeys.length = 0;
     this.renderedMessageKeySet.clear();
-    this.appendLocalMessage('system', `Loading history for #${normalizedChannel}...`);
 
     try {
+      const active = await this.tmc.accounts.getActive();
+      if (!this.isCurrentGeneration(generation)) return;
+      if (!active.isLoggedIn) {
+        this.appendLocalMessage('system', 'Use Login to sign in, load chat history and connect to live chat.');
+        return;
+      }
+      this.appendLocalMessage('system', `Loading history for #${normalizedChannel}...`);
       await this.tmc.accountChannels.setLast({ channel: normalizedChannel });
       const channelStateResult = await this.tmc.accountChannels.addRecent({
         channel: normalizedChannel,

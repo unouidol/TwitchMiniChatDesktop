@@ -1,5 +1,6 @@
 ﻿import fs from 'node:fs';
 import path from 'node:path';
+import { app } from 'electron';
 
 /**
  * Map of key/value pairs loaded from a Java-style local.properties file.
@@ -7,12 +8,14 @@ import path from 'node:path';
 export type LocalProperties = Readonly<Record<string, string>>;
 
 /**
- * Reads local development properties from the project root.
+ * Reads local development properties from the working directory in development.
  *
  * This is intentionally used only by the Electron main process. Secrets loaded
  * from local.properties must never be exposed directly to the renderer.
+ * Packaged applications never probe this developer configuration file.
  */
 export function readLocalPropertiesFromProjectRoot(): LocalProperties {
+  if (app.isPackaged) return {};
   const propertiesPath = path.join(process.cwd(), 'local.properties');
 
   if (!fs.existsSync(propertiesPath)) {

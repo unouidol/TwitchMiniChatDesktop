@@ -1,8 +1,8 @@
 {
   "name": "twitchminichatdesktop",
   "productName": "twitchminichatdesktop",
-  "version": "1.1.0-dev.16",
-  "description": "My Electron application description",
+  "version": "1.1.0-dev.17",
+  "description": "TMC desktop chat client",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
@@ -13,7 +13,8 @@
     "lint": "eslint --ext .ts,.tsx,.mjs . --max-warnings 0 --report-unused-disable-directives",
     "typecheck": "tsc --noEmit",
     "test": "tsc --project tsconfig.test.json && node --experimental-test-module-mocks --test tests/*.test.cjs",
-    "test:e2e": "node tests/e2e/account-removal.mjs"
+    "test:e2e": "node tests/e2e/account-removal.mjs",
+    "test:packaged": "node tests/e2e/packaged-smoke.mjs"
   },
   "keywords": [],
   "author": {

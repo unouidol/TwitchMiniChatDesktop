@@ -170,6 +170,8 @@ not an automated check. Backend/OAuth setup needs suitable development
 configuration. Never attach credentials to issues or test fixtures.
 Use `npm run package` for packaging changes and before releases; packaging is not
 part of this quality workflow and does not establish correct authentication.
+For the local Windows installer and the separate protected-artifact smoke test,
+see [local Windows packaging](docs/windows-local-package.md).
 
 ## Continuous integration
 

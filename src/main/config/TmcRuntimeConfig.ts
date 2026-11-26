@@ -1,4 +1,5 @@
 import { readLocalPropertiesFromProjectRoot } from './LocalPropertiesReader';
+import { app } from 'electron';
 
 /**
  * Runtime configuration used by the Electron main process.
@@ -158,12 +159,7 @@ export const TMC_RUNTIME_CONFIG: TmcRuntimeConfig = {
     readConfigValue('TMC_DESKTOP_CLIENT_ID', ['TMC_DESKTOP_CLIENT_ID']) ||
     'tmc-desktop-electron',
 
-  desktopClientVersion:
-    process.env.npm_package_version?.trim() ||
-    readConfigValue('TMC_DESKTOP_CLIENT_VERSION', [
-      'TMC_DESKTOP_CLIENT_VERSION',
-    ]) ||
-    '0.1.0',
+  desktopClientVersion: app.getVersion(),
 
   desktopFlavor:
     readConfigValue('TMC_DESKTOP_FLAVOR', ['TMC_DESKTOP_FLAVOR']) || 'dev',
