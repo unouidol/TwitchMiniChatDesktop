@@ -7,6 +7,18 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { build } from 'vite';
 import { remote } from 'webdriverio';
 import { startFixture } from './fixture.mjs';
+import { exerciseLoginDialog } from './login-dialog.mjs';
+import { exerciseLayout } from './layout.mjs';
+import { exercisePcgMenu } from './pcg-menu.mjs';
+import { exerciseEmotes } from './emotes.mjs';
+import { exerciseReplies } from './replies.mjs';
+import { exerciseUserColors } from './user-colors.mjs';
+import { exerciseMentions } from './mentions.mjs';
+import { exerciseAppearance, verifyAppearanceRestart } from './appearance.mjs';
+import { exerciseTimestamps } from './timestamps.mjs';
+import { exerciseBadges } from './badges.mjs';
+import { exerciseSearch } from './search.mjs';
+import { appVersionPlugin } from '../../build/appVersion.mjs';
 import { observeDriverTraffic, provenance, verifyDriver } from './driver.mjs';
 import { verifyNetworkEvidence } from './network-evidence.mjs';
 import { createCanonicalTemporaryDirectory, finalizeAccountRemoval, trackOwnedDrivers } from './finalize.mjs';
@@ -28,6 +40,7 @@ const inheritedRunAsNode = process.env.ELECTRON_RUN_AS_NODE;
 delete process.env.ELECTRON_RUN_AS_NODE;
 let scenarioError;
 let result;
+let windowSizeSequence = 0;
 
 async function waitFor(predicate, message, timeout = 20000) {
   const deadline = Date.now() + timeout;
@@ -60,6 +73,26 @@ async function options() {
     if (!(select instanceof HTMLSelectElement)) throw new Error('Account select is missing or invalid');
     return Array.from(select.options, (option) => option.value);
   `);
+}
+
+async function readNativeViews() {
+  const snapshots = (await fs.readdir(root)).filter((name) => /^first-pcg-bounds-\d+\.json$/.test(name));
+  snapshots.sort((a, b) => Number(a.match(/(\d+)\.json$/)[1]) - Number(b.match(/(\d+)\.json$/)[1]));
+  return snapshots.length ? JSON.parse(await fs.readFile(path.join(root, snapshots.at(-1)), 'utf8')) : [];
+}
+
+// ChromeDriver's Browser.getWindowForTarget is unavailable for this Electron
+// build. Control only this run's actual BrowserWindow through its marked root.
+async function resizeOwnedWindow(width, height) {
+  const sequence = ++windowSizeSequence;
+  const command = path.join(root, `first-window-size-${sequence}.json`);
+  await fs.writeFile(command, JSON.stringify({ width, height }), { flag: 'wx' });
+  const acknowledgement = path.join(root, `first-window-size-${sequence}.ack.json`);
+  await waitFor(async () => {
+    try { await fs.access(acknowledgement); return true; }
+    catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+  }, 'owned native window resize');
+  return JSON.parse(await fs.readFile(acknowledgement, 'utf8'));
 }
 
 async function readNetworkEvidence(phase) {
@@ -174,6 +207,7 @@ try {
     rollupOptions: { external: ['electron'] },
   } });
   await build({ configFile: false, envFile: false, root: project, base: './',
+    plugins: [appVersionPlugin('e2e')],
     build: { outDir: path.join(output, 'renderer/main_window'), emptyOutDir: false } });
   fixture = await startFixture();
   const first = await launch('first');
@@ -187,10 +221,35 @@ try {
   assert.equal(initialActiveProfileId, first.startupPreferredProfileId, 'Startup selection must honor the saved preference');
   assert.match(await browser.$('[data-tmc-account-status]').getText(),
     new RegExp(`fixture-${first.startupPreferredProfileId.toLowerCase()}`));
+  await exerciseLoginDialog(browser, evidence);
+  assert.deepEqual(fixture.requests.filter((entry) => entry.path === '/finalize').map((entry) => entry.accepted), [false, false, true]);
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, 'browser-attempts.json'), 'utf8')), { browserAttempts: 2 });
+  await exerciseLayout(browser, fixture, evidence, readNativeViews);
+  await exercisePcgMenu(browser, evidence, readNativeViews, async (state) => {
+    const destination = path.join(root, 'pcg-cookie-command');
+    await fs.writeFile(`${destination}.tmp`, state);
+    await fs.rename(`${destination}.tmp`, destination);
+    await waitFor(async () => {
+      try { return (await fs.readFile(path.join(root, 'pcg-cookie-ack'), 'utf8')) === state; }
+      catch (error) { if (error.code !== 'ENOENT') throw error; return false; }
+    }, 'synthetic browser-session fixture change');
+  });
+  await exerciseEmotes(browser, fixture, evidence, readNativeViews, async () => {
+    try { return JSON.parse(await fs.readFile(path.join(root, 'chat-link-attempts.json'), 'utf8')).attempts; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; return []; }
+  }, resizeOwnedWindow);
+  await exerciseAppearance(browser, fixture, evidence, readNativeViews);
+  await exerciseTimestamps(browser, fixture, readNativeViews);
+  await exerciseReplies(browser, fixture, evidence);
+  await exerciseUserColors(browser, fixture, evidence);
+  await exerciseMentions(browser, fixture, evidence, readNativeViews);
+  await exerciseBadges(browser, fixture, evidence, readNativeViews);
+  await exerciseSearch(browser, fixture, evidence, readNativeViews);
   await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
   await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-a'),
     { timeout: 20000, timeoutMsg: 'UI selected-account display should show A' });
   await waitFor(() => fixture.chats.some((chat) => chat.username === 'fixture-a' && !chat.closed), 'real IRC client connects to local fixture');
+  await browser.$('[data-tmc-account-menu] summary').click();
   await browser.$('[data-tmc-remove-local-account]').click();
   await browser.waitUntil(() => browser.isAlertOpen(), { timeout: 10000 });
   assert.match(await browser.getAlertText(), /Remove this account from this device/);
@@ -205,6 +264,8 @@ try {
   await closeApplication(first);
   const firstNetwork = await readNetworkEvidence('first');
   const restarted = await launch('restart');
+  await verifyAppearanceRestart(browser);
+  await browser.waitUntil(async () => (await browser.$('.tmc-pcg-panel').getAttribute('data-tmc-pcg-twitch-auth')) === 'session-present');
   assert.notEqual(restarted.pid, first.pid);
   assert.deepEqual(restarted.savedProfiles, ['B']);
   assert.deepEqual(await options(), ['B']);
@@ -212,6 +273,14 @@ try {
   assert.match(await browser.$('[data-tmc-account-status]').getText(), /fixture-b/);
   assert.deepEqual(fixture.requests.filter((entry) => entry.phase === 'restart' && entry.path === '/restore')
     .map((entry) => entry.profileId), ['B']);
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected', { timeout: 20000 });
+  const restartedFavorites = await browser.executeAsync((done) => {
+    globalThis.window.tmc.emotes.getCatalog({ profileId: 'B', channel: 'fixture-channel' }).then(
+      (catalog) => done({ favorites: catalog.favorites.map((emote) => emote.name), failed: catalog.favoritesSaveFailed }),
+      () => done({ failed: true }),
+    );
+  });
+  assert.deepEqual(restartedFavorites, { favorites: ['Kappa', 'Keepo'], failed: false }, 'Fresh Electron process restores only B favorites');
   await closeApplication(restarted);
   const restartNetwork = await readNetworkEvidence('restart');
   assert.deepEqual(await fs.readdir(cacheDir), [], 'WDIO acquisition cache must remain empty');
@@ -219,6 +288,7 @@ try {
   assert.ok(traffic.events.every((event) => event.allowed), 'WDIO parent must not request external acquisition');
   assert.equal(driverTracking.drivers.size, 2, 'Both explicit ChromeDriver child handles must be owned by this run');
   assert.deepEqual(fixture.failures, []);
+  assert.equal(fixture.sentMessages.length, 6, 'Navigation/refresh/restart must not replay sent messages');
   const failureLog = await fs.readFile(path.join(root, 'failures.log'), 'utf8').catch((error) => {
     if (error.code !== 'ENOENT') throw error;
     return '';

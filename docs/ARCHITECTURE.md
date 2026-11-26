@@ -5,6 +5,246 @@ It is an orientation aid; inspect code and callers before changing behavior.
 
 ## Current boundaries
 
+The shell follows the actual client viewport inside a 960x650 outer-window
+minimum, accounting for Windows frame borders; the document itself does not
+scroll. Sidebar, message feed and catalogs own their scrolling. This
+keeps DOM host positions aligned with native PCG bounds when Windows constrains
+the application to a narrow display or focus changes inside the chat controls.
+
+Local chat search is owned by TmcChatSearchController through the existing
+channel controller. Search opens an integrated panel with a button or Ctrl/Cmd+F,
+matches literal NFC/case-normalized message text (including original emote codes)
+and username, and never requests more history or persists queries. Enter and
+Shift+Enter cycle results; Escape/close returns to the unchanged composer draft.
+Only row classes change, preserving actual emote, link, badge and reply nodes.
+The existing scroll owner reveals a result while search keeps keyboard focus;
+incoming matches update the count without navigating or sending messages.
+New history/live rows register incrementally. The index retains at most 10000
+recent rows and two million normalized characters; eviction or oversized input
+is disclosed alongside the indexed-message count, without removing chat rows.
+Account/auth/channel/history resets clear the query/index/highlights and close
+the panel; disposal releases all listeners and row references. Ctrl+F does not
+move focus behind an open login dialog. PCG remains a separate native surface.
+
+Twitch badge identities come only from supplied PRIVMSG/USERSTATE tags or a
+history badges field (IRC string or structured set/version entries). They are
+bounded and deduplicated; missing metadata never becomes a guessed role. Own
+USERSTATE badges reset on every connection. TmcBadgeCatalogService validates the
+initiating OAuth identity, resolves the exact channel login, and combines Helix
+global/channel chat badge definitions with channel versions taking precedence.
+Fixed endpoints reject redirects; image URLs must match the fixed Twitch badge
+CDN path. A single ten-second deadline covers requests and bodies. Cache entries
+are profile/token/channel-scoped, at most eight contexts, with four concurrent
+loads; successful definitions last 30 minutes and failures back off 30 seconds.
+Stale account/token completions are rejected without changing authentication.
+The explicit CHAT_BADGES IPC accepts only the trusted local main frame and
+returns public definitions, never credentials or raw provider responses.
+
+The channel controller owns TmcChatBadgeController and supplies newly rendered
+author nodes. It retains at most 1000 pending containers, never rescans growing
+history and requests a catalog only when supplied badge metadata needs it.
+Renderer definitions expire after five minutes when new rows arrive; failures retain
+text labels for 30 seconds. Account/auth/channel/history resets and pagehide
+invalidate pending results and release references. Fixed-size, lazy images have
+plain-text titles and a text fallback on failure; badge layout changes notify
+the existing scroll owner. No badge selection, moderation action or new chat
+transport is introduced. Historical messages without badge metadata stay unbadged.
+
+Chat appearance extends the existing TmcSettingsStore/settings.json owner with
+desktop-wide font size (14/16/18/20 px) and comfortable/compact message spacing.
+The same appearance value includes timestamp visibility (shown by default).
+Hiding uses chat-only CSS for existing and future history/live rows; original
+time text and machine-readable datetime remain intact. Older appearance objects
+retain their font/density when gaining the timestamp default.
+Older valid settings receive defaults in memory without a migration write on
+read. All store operations serialize, so legacy channel writes preserve appearance
+and concurrent edits do not compete for the atomic temporary file. Malformed
+JSON and filesystem failures propagate without replacing the original data.
+Explicit trusted-main-frame IPC validates the appearance payload. The renderer
+applies saved values through chat-only CSS, leaving existing rows, drafts and
+native PCG views intact; controls report failures and keep the last saved choice.
+Changing appearance notifies the existing scroll owner, preserving a reader's
+pause and keeping followers at the latest message. Listeners are removed on pagehide.
+
+Chat replies reuse the existing IRC connection. Server UUID messages in live
+chat and history expose a Reply action; system messages and local echo IDs do
+not. The renderer owns one cancelable preview above the composer, scoped to the
+initiating profile/channel and invalidated on navigation/account/auth events.
+Selecting/canceling never sends or removes draft text. Explicit Send includes
+the parent UUID via Twitch's reply-parent-msg-id tag; it never retries/replays.
+The send IPC validates the trusted local main frame, payload, active profile and
+connected channel. Reply preview fields are bounded plain text, never HTML.
+Incoming IRC reply tags render parent author/text above the message. Backend
+history currently supplies no normalized reply metadata; its real message UUIDs
+remain replyable, but missing parent context is not reconstructed. Local echoes
+mean a socket write, not Twitch delivery acknowledgment. Pending send completion
+does not clear a changed draft, selection or account/channel context. Chat dedup
+keys reset with the displayed history so old context cannot hide newly loaded
+messages after an account/channel switch.
+Reply controls reserve their space but appear only on message hover or keyboard
+focus within the message; devices without hover keep the controls visible.
+
+Main classifies attention for the selected account through the pure
+TmcChatAttention helper. Whole-word, case-insensitive login matches with or
+without @ count as mentions; embedded names, email addresses, URLs and own
+messages do not. Incoming replies prefer Twitch's parent user ID, falling back
+to parent login only when that ID is absent; display names and quoted text
+never determine the recipient. History classification uses copied results and
+rejects account/token changes across the load, without modifying cached history.
+Live decoration reads the current main-process account; history captures its
+initiating identity across the asynchronous load. Only profile ID and
+mention/reply kind reach the renderer.
+
+The existing channel controller owns a bounded index of the most recent 1000
+matching rows. Mentions (N) cycles loaded matches, including history, rather than
+claiming an unread count. Navigation focuses the row and pauses automatic scroll
+through the existing scroll controller. Account/auth/channel/history changes
+clear the index and old highlights; asynchronous obsolete loads cannot restore
+them. No notification permission, sound, outgoing message or extra transport is
+introduced.
+
+Twitch name colors are optional six-digit RGB metadata. Main validates IRC
+PRIVMSG color tags and the backend history color field before exposing them;
+the renderer validates again when applying author color. GLOBALUSERSTATE and
+current-channel USERSTATE update only the connection's own local-echo color,
+which resets on every new connection/account. Missing/invalid metadata initially
+uses a stable username palette; background enrichment can replace it with the
+user's current Twitch color. Bots follow the same provider metadata as any user,
+without guessed bot lists. Lookup colors describe current settings, not the
+original color at the time of a historical message.
+
+TmcUserColorService is the main-process owner of missing-color lookup/cache.
+It validates the initiating OAuth user/client, resolves up to 100 Twitch logins
+with Get Users, then requests their IDs with Get User Chat Color. Fixed HTTPS
+endpoints reject redirects, unexpected/duplicate identities and non-RGB CSS.
+One 10-second deadline covers fetches and bodies. At most 4 batches run concurrently;
+at most 8 account/token contexts each keep 1000 entries. Positive results last
+30 minutes, missing users/unset colors 5 minutes; failures back off 30 seconds and
+retain authentication and readable fallback colors. No access token or raw API
+object crosses the trusted CHAT_USER_COLORS IPC boundary; it accepts bounded
+profile/channel/login arrays from the local main frame only.
+
+TmcChatNameColorController enriches newly rendered author nodes in 60ms batches;
+it never rescans growing chat history per message. The existing channel/chat
+owner passes new nodes from history/live rendering, resets the controller on
+auth/account/navigation and disposes it on pagehide. Pending nodes, attempted
+names and known display colors are bounded to 1000 per displayed context; requests
+contain at most 100 names. Timer/pending identity is revision/profile/channel
+scoped. Same-author nodes arriving during lookup share its result, while real
+message metadata arriving meanwhile takes precedence over a late API response.
+Unknown/unset/failing lookups retain the palette and are retried on a subsequent
+context/history refresh rather than on every incoming message.
+
+Composer autocomplete is renderer-owned in initializeChatCompletion.ts, with
+portable token/matching/edit rules in TmcChatCompletion.ts. Whitespace-delimited
+@ prefixes use up to 1000 distinct logins already observed by the existing channel
+controller in history/live messages; this is not a viewer list or a new API.
+Colon prefixes use the existing trusted emote-catalog operation/cache, delayed
+150ms and scoped to profile/channel/revision. Only available emotes are offered,
+with favorites prioritized, case-insensitive search and exact-case insertion.
+At most 20 options render in an inline listbox above the composer. The main picker
+and completion list are mutually exclusive through their existing owners; PCG
+stays loaded and its bounds are unchanged. A local catalog reference is checked
+for five-minute expiry on interaction and discarded on blur, dismissal, context/
+auth changes and pagehide; late
+responses cannot populate a different context or move focus.
+
+The combobox keeps input focus, announces selection with aria-activedescendant,
+and accepts arrows plus Tab/Enter or click; accepting never submits, including
+repeated Enter events from a held key. Escape
+closes suggestions before reply cancellation. Capturing key handling leaves the
+existing input-history owner active when suggestions are closed. Composition
+events keep IME input native. Insertion replaces only the current token and emits
+an input notification for existing draft/history owners, while suppressing its
+own reopening. Noncollapsed selections and embedded email/URL/time markers do
+not trigger completion. Timers/listeners are released through pagehide ownership.
+
+Twitch received messages and history share validated text/emote fragments from
+`shared/chat/TmcMessageContent.ts`. Main parses the IRC emotes tag or backend
+emotes/emotes_raw/emotesRaw alias into inclusive Unicode code-point ranges, preserving
+original message text and spaces. ACTION envelopes are removed only for display.
+Malformed/conflicting or excessive metadata falls back to readable text. IDs
+generate only fixed HTTPS Twitch CDN URLs; remote message URLs/HTML are not used.
+
+`renderer/chat/createMessageContent.ts` owns DOM creation for both paths: text
+nodes and fixed-size images with alt/title, lazy decoding/loading and text
+fallback on image error. No additional OAuth/API catalog request is needed to
+render received tagged emotes. Local outgoing echoes use an already loaded,
+unexpired catalog for the current account/token/channel; without it they remain
+plain text. Third-party providers are separate follow-up work. No code was copied
+from Chatterino.
+
+The same message-content builder recognizes explicit HTTP/S URLs in text pieces
+for history, live and local echoes. It retains exact text, keeps emotes separate,
+trims prose punctuation/unmatched closing brackets, and creates at most 100 links
+per message. Oversized raw candidates remain text before punctuation processing;
+bracket counts are computed once. Raw/canonical URLs are bounded to 4096 characters
+and reject controls, backslashes, user-info and other schemes. DOM textContent
+is used throughout; message HTML and file/script/custom-protocol links stay inert.
+
+Chat anchors expose their real destination, noopener/noreferrer and keyboard
+focus. Trusted primary/middle/keyboard activation prevents Chromium navigation
+and calls CHAT_OPEN_LINK; the handler validates the local main frame and URL
+again before shell.openExternal. Only this OS-browser boundary opens the link.
+One pending open per anchor avoids accidental concurrent duplicates; failures
+show an inline status and permit an explicit retry, without URL logging or
+automatic retries. Detached message nodes do not insert late error UI. The main
+local window denies renderer popups and navigation; PCG windows retain their
+separate existing ownership/navigation policies.
+
+`TmcEmoteCatalogService` is the single main-process catalog/cache owner. On picker
+request it validates the active OAuth token to obtain the matching client/user
+and scopes, then requests Twitch global/channel/paginated user emotes. No token
+or provider-supplied image URL reaches the renderer. Requests share a fifteen-
+second deadline (including bodies), reject redirects/identity mismatches and
+stale account/token completions, and bound pages/items/pending requests. Cached
+catalogs last five minutes and are limited to eight account contexts, keyed by
+profile plus token fingerprint and channel. Catalog metadata is temporary memory;
+the same service owns a separate non-secret favorites file described below.
+No authentication is deleted on
+provider errors. Missing user:read:emotes is explicit: globals remain available;
+channel entitlement is unknown and personal emotes are unavailable.
+
+The EMOTE_CATALOG handler accepts only the trusted local main frame and validates
+profile/channel payloads; the service captures the initiating session. The
+integrated emote section sits below the message feed and above the composer, occupies
+at most 40% of the chat column and scrolls its own grid. The feed reserves at
+least 180px so a wrapped toolbar on narrow Windows desktops shrinks the picker
+instead of making messages unreadable. It has no dialog, backdrop
+or focus trap; chat/composer/account controls and PCG remain available. The toggle
+announces expansion, while X/Escape/toggle hide it. Choosing an emote inserts at
+the composer's current selection and keeps the panel open for further selection;
+it never submits. It closes/discards results on account/channel/auth changes.
+The existing chat-scroll owner handles panel layout changes: followers stay at
+the bottom and readers of older messages are not forced to the latest. PCG bounds
+are unaffected by this inline panel. One scrolling page contains Favorites,
+Channel, Account, then Global; Account omits duplicates already in Channel/Global.
+One search filters every section, with at most300 choices rendered across all
+sections and a request to narrow larger results. Third-party catalogs remain
+unimplemented.
+While a search query is present, matching IDs appear once in a single grid with
+no category headings/empty categories. Available representations take precedence
+over disabled duplicates. An empty match shows one message; clearing the query
+restores the ordered sections without changing favorites or loading a new catalog.
+
+After an explicit successful IRC socket write, the chat handler records known
+available emote IDs with the initiating profile in TmcEmoteCatalogService.
+Choosing an emote, receiving chat/history and failed sends never record usage.
+New distinct IDs prepend to a 24-item per-account list and evict its tail; reuse
+does not move entries. Main serializes read/modify/atomic-write operations through
+JsonFileStore in userData/tmc-emote-favorites.json. Only bounded profile IDs and
+emote IDs/names persist; no token, message text or provider URL is saved. Reads
+validate the schema and reject malformed/duplicate/unbounded data rather than
+overwriting it. Failures preserve the send success and produce a favorites
+warning in the picker, so storage failure cannot encourage a duplicate send.
+Favorites survive restart and channel changes and remain separate per account.
+The catalog response joins saved IDs with current availability; missing/revoked
+entitlement disables a favorite without deleting/reordering it. Known cached
+IDs can be recorded after the display TTL, with no send-time network requests;
+unknown names or an absent/mismatched catalog are not guessed. After Send, an
+open picker refreshes through the cached catalog path, retaining search/scroll
+and rejecting completions for an obsolete account/channel/panel revision.
+
 | Area | Responsibility | Allowed dependencies |
 | --- | --- | --- |
 | `src/main.ts`, `src/main/` | App startup, accounts/auth, backend requests, IRC, local storage, PCG web surfaces | Electron/Node and shared contracts; no renderer implementation imports |
@@ -17,6 +257,69 @@ imports and runtime entry points before moving or deleting them; do not copy the
 exception into new code.
 
 ## Startup and authentication
+
+The main-window title, local document/header and preload app-info display name
+are `TMC desktop`. Internal package identity and existing profile/storage paths
+remain unchanged; the display rename does not migrate saved authentication.
+The Vite HTML transform in `build/appVersion.mjs` stamps the main document title
+and visible header badge with package.json's version and one UTC compilation ID.
+Development/build/E2E labels identify the launch type. The native main-window
+title follows that local document title. This is display/build metadata, not a
+Git cleanliness/provenance claim; hot edits need a fresh launch for a new stamp.
+
+The renderer's `initializeAuthPanel.ts` owns a native modal login dialog, opened
+by the compact Login button. It displays either the browser-launch step or the
+claim-code step. Browser-launch acknowledgment advances the UI; it does not
+prove that remote OAuth completed. Users can also choose an existing code.
+Clipboard reading occurs only on Paste code, with keyboard paste as fallback.
+Cancellation clears the field, and attempt identity rejects late browser or
+clipboard completions. Finalization disables dismissal until the existing main
+operation settles; the broker bounds finalization fetch and body consumption to
+ten seconds so a stalled response returns the dialog to an editable retry state.
+The dialog closes only after success, then notifies account UI.
+No access/session token or additional privileged clipboard bridge is exposed.
+
+Before opening the dialog, the renderer hides the native embedded PCG surface
+through the existing bridge. Bounds synchronization keeps it hidden while the
+dialog is opening/open, including on resize and activation. Closing schedules
+normal bounds restoration. Hiding does not unload or destroy PCG authentication.
+Detached PCG windows remain separate. PCG's Twitch sign-in is a separate flow.
+
+The compact header uses one account selector and an accessible status region;
+removal is inside Account options and still requires the existing confirmation.
+The options menu closes on outside pointer interaction, focus leaving it or
+Escape. Embedded PCG bounds are hidden while this menu is open, without unloading
+the view, and restored on closure through the existing bounds owner.
+
+The compact PCG header shows its title/status and a PCG options details menu.
+The existing game-specific Twitch sign-in and separate-window actions live in
+that menu. Escape, outside pointer interaction and focus leaving close it;
+choosing an action closes it before invoking the existing bridge operation.
+While open, normal bounds synchronization hides the embedded native surface so
+it cannot cover the DOM menu. Closing restores bounds without reactivation,
+navigation or replacement of that view. Separate-window behavior remains owned
+by the existing main-process PCG manager; resizing/collapsing is separate work.
+
+`TmcPcgStatus.twitchAuth` reports only local browser-session evidence: unknown,
+signed-out or session-present. The PCG manager queries the auth-token cookie's
+presence in the active view's account partition and observes relevant cookie
+changes (including logout/expiry). Cookie values never reach logs or renderer.
+Unknown lookup errors do not imply revoked authentication and retain the panel.
+View/partition/profile and query revisions reject late results; listeners are
+released on replacement/destruction. Activation revisions also reject old panel
+loads before publishing status for a different account.
+
+An active panel without confirmed session evidence shows an explicit game-login
+prompt above its host. With a session present, that prompt is hidden and sign-in
+remains in PCG options. Both actions use the same existing popup operation.
+Presence is not a live Twitch validity check, account-name verification or PCG
+extension authorization. Any extension-specific consent remains in its own UI.
+
+Channel navigation is an explicit Open channel form. Refresh history is a
+separate chat-toolbar action. The chat controller owns the opened channel and
+updates its label; Refresh, Favorite and composer submission use that committed
+channel, not unsubmitted navigation text. Account/channel persistence and main
+IPC services retain their existing ownership.
 
 `src/main.ts` registers IPC through `main/ipc/registerIpcHandlers.ts` and then
 creates the local main window. Registration currently also constructs services

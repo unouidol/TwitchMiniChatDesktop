@@ -10,6 +10,8 @@ import { TMC_IPC_CHANNELS } from '../../shared/ipc/IpcChannels';
 import type { TmcAccountSessionRegistry } from '../accounts/TmcAccountSessionRegistry';
 import { TmcTwitchIrcClient } from '../chat/TmcTwitchIrcClient';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
+import { assertLocalRenderer } from './assertLocalRenderer';
+import { readChatReply } from '../../shared/chat/TmcChatReply';
 
 export type TmcChatIpcController = {
   /**
@@ -24,6 +26,8 @@ export type TmcChatIpcController = {
 export function registerChatIpcHandlers(
   runtimeConfig: TmcRuntimeConfig,
   accountRegistry: TmcAccountSessionRegistry,
+  decorateMessage: (message: TmcLiveChatMessage) => TmcLiveChatMessage = (message) => message,
+  onMessageSent: (profileId: string, message: TmcLiveChatMessage) => Promise<void> = async () => undefined,
 ): TmcChatIpcController {
   let rendererSender: WebContents | null = null;
   const ircClient = new TmcTwitchIrcClient({
@@ -31,7 +35,7 @@ export function registerChatIpcHandlers(
       sendToRenderer(
         rendererSender,
         TMC_IPC_CHANNELS.CHAT_LIVE_MESSAGE,
-        message,
+        decorateMessage(message),
       );
     },
     onStatusChanged: (status: TmcChatLiveStatus): void => {
@@ -83,6 +87,10 @@ export function registerChatIpcHandlers(
       event: IpcMainInvokeEvent,
       request: TmcSendChatMessageRequest,
     ): Promise<TmcChatLiveStatus> => {
+      assertLocalRenderer(event);
+      if (!request || typeof request.profileId !== 'string' || !request.profileId || request.profileId.length > 256 ||
+          typeof request.channel !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(request.channel) || typeof request.text !== 'string' || request.text.length > 2000 ||
+          (request.reply !== undefined && !readChatReply(request.reply))) throw new Error('Invalid chat message.');
       rendererSender = event.sender;
 
       const session = accountRegistry.getActiveSession();
@@ -91,17 +99,25 @@ export function registerChatIpcHandlers(
         throw new Error('Login required.');
       }
 
+      if (session.profileId !== request.profileId) throw new Error('Chat account changed.');
       if (ircClient.getConnectedUsername() !== session.username.toLowerCase()) {
         throw new Error('Live chat connection required.');
       }
 
-      const message = ircClient.sendMessage(request.channel, request.text);
+      const message = ircClient.sendMessage(request.channel, request.text, request.reply);
+      const decoratedMessage = decorateMessage(message);
       sendToRenderer(
         rendererSender,
         TMC_IPC_CHANNELS.CHAT_LIVE_MESSAGE,
-        message,
+        decoratedMessage,
       );
 
+      try {
+        await onMessageSent(session.profileId, message);
+      } catch {
+        // The IRC write already happened; metadata failure must not invite resend.
+        console.warn('[TMC Emotes] Message sent, but post-send emote metadata could not be saved.');
+      }
       return ircClient.getStatus();
     },
   );

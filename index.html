@@ -7,65 +7,42 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; form-action 'self';"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Twitch Mini Chat Desktop</title>
+    <title>TMC desktop</title>
   </head>
 
   <body>
     <main class="tmc-shell">
       <header class="tmc-header">
-        <div class="tmc-header-title" aria-label="Twitch Mini Chat Desktop">
-          <h1>TMC Desktop</h1>
+        <div class="tmc-header-title" aria-label="TMC desktop">
+          <h1>TMC desktop</h1>
+          <span data-tmc-app-version></span>
         </div>
 
         <div class="tmc-header-actions">
-          <section class="tmc-panel tmc-auth-panel" aria-labelledby="tmc-auth-title">
-            <h2 id="tmc-auth-title" class="tmc-auth-title">Twitch login</h2>
+          <div class="tmc-auth-panel">
+            <button type="button" class="tmc-button tmc-auth-login-button"
+              aria-haspopup="dialog" aria-controls="tmc-login-dialog" data-tmc-auth-login>
+              Login
+            </button>
+            <p class="tmc-auth-open-error" role="status" data-tmc-auth-open-error hidden></p>
+          </div>
 
-            <p class="tmc-auth-status" data-tmc-auth-status>
-              Not logged in.
-            </p>
-
-            <div class="tmc-auth-controls">
-              <button type="button" class="tmc-button tmc-auth-login-button" data-tmc-auth-login>
-                Login with Twitch
-              </button>
-
-              <div class="tmc-auth-code-group">
-                <label class="tmc-field-label" for="tmc-login-code">
-                  Paste login code
-                </label>
-
-                <div class="tmc-auth-finalize-row">
-                  <input
-                    id="tmc-login-code"
-                    class="tmc-text-input tmc-auth-code-input"
-                    type="text"
-                    autocomplete="one-time-code"
-                    spellcheck="false"
-                    data-tmc-auth-code
-                    placeholder="Paste code from browser"
-                  />
-
-                  <button
-                    type="button"
-                    class="tmc-button tmc-button-secondary tmc-auth-finalize-button"
-                    data-tmc-auth-finalize
-                  >
-                    Finalize login
-                  </button>
-                </div>
+          <section class="tmc-account-panel" aria-label="Accounts" data-tmc-account-switcher>
+            <label class="tmc-account-label" for="accountSelect">Account</label>
+            <select id="accountSelect" class="tmc-text-input" data-tmc-account-select disabled>
+              <option value="">Loading accounts…</option>
+            </select>
+            <p class="tmc-visually-hidden" role="status" data-tmc-account-status>Loading accounts…</p>
+            <details class="tmc-options-menu" data-tmc-account-menu>
+              <summary aria-label="Account options" title="Account options">•••</summary>
+              <div class="tmc-options-menu-content">
+                <span class="tmc-section-kicker">Account options</span>
+                <p>Manage the selected account on this device.</p>
+                <button type="button" class="tmc-remove-account-button" data-tmc-remove-local-account disabled>
+                  Remove account…
+                </button>
               </div>
-            </div>
-          </section>
-
-          <section class="tmc-panel tmc-account-panel" aria-label="Accounts">
-            <div class="tmc-account-header">
-              <span class="tmc-section-kicker">Account</span>
-            </div>
-
-            <div class="tmc-account-content" data-tmc-account-switcher>
-              <span class="tmc-muted">Loading accounts...</span>
-            </div>
+            </details>
           </section>
 
 
@@ -79,7 +56,7 @@
 
             <form class="tmc-channel-form" id="channelForm">
               <label class="tmc-field-label" for="channelInput">
-                Current channel
+                Go to channel
               </label>
 
               <input
@@ -88,13 +65,17 @@
                 type="text"
                 autocomplete="off"
                 spellcheck="false"
-                placeholder="unouidol"
+                placeholder="Channel name"
+                required
               />
 
-              <button id="loadHistoryButton" class="tmc-primary-button" type="submit">
-                Refresh history
+              <button id="openChannelButton" class="tmc-primary-button" type="submit">
+                Open channel
               </button>
             </form>
+            <button type="button" class="tmc-button tmc-button-secondary tmc-favorite-toggle-button" data-tmc-toggle-favorite-channel>
+              Favorite current
+            </button>
 
             <div class="tmc-channel-section">
               <h3>Recent</h3>
@@ -115,20 +96,50 @@
               </div>
             </div>
           </div>
+            <details class="tmc-chat-appearance" data-tmc-chat-appearance>
+              <summary>Chat appearance</summary>
+              <label for="chatFontSize">Text size</label>
+              <select id="chatFontSize" disabled>
+                <option value="14">14 px</option><option value="16" selected>16 px</option>
+                <option value="18">18 px</option><option value="20">20 px</option>
+              </select>
+              <label for="chatDensity">Message spacing</label>
+              <select id="chatDensity" disabled>
+                <option value="comfortable">Comfortable</option><option value="compact">Compact</option>
+              </select>
+              <p class="tmc-muted" data-tmc-appearance-status role="status"></p>
+              <label class="tmc-chat-checkbox" for="chatTimestamps"><input id="chatTimestamps" type="checkbox" checked disabled /> Show timestamps</label>
+            </details>
         </aside>
 
         <section class="tmc-chat">
           <div class="tmc-chat-toolbar">
             <div>
               <span class="tmc-section-kicker">Chat</span>
-              <strong id="chatChannelLabel">#unouidol</strong>
+              <strong id="chatChannelLabel">No channel open</strong>
+              <p class="tmc-live-status" data-tmc-live-status>Live: disconnected</p>
             </div>
-
-            <p class="tmc-live-status" data-tmc-live-status>
-              Live: disconnected
-            </p>
+            <div class="tmc-chat-actions">
+            <button type="button" class="tmc-button tmc-button-secondary" data-tmc-search-toggle aria-expanded="false" aria-controls="chatSearchPanel" title="Search loaded chat (Ctrl+F)">Search</button>
+            <button type="button" class="tmc-button tmc-button-secondary" data-tmc-mentions disabled>Mentions (0)</button>
+            <button id="loadHistoryButton" class="tmc-button tmc-button-secondary" type="button">
+              Refresh history
+            </button>
+            </div>
           </div>
 
+
+          <section id="chatSearchPanel" class="tmc-chat-search" data-tmc-search-panel hidden aria-label="Search loaded chat">
+            <label for="chatSearch">Find in chat</label>
+            <div class="tmc-chat-search-controls">
+              <input id="chatSearch" type="search" placeholder="Text or username" maxlength="200" autocomplete="off" spellcheck="false" />
+              <button type="button" data-tmc-search-previous aria-label="Previous match" title="Previous match (Shift+Enter)" disabled>↑</button>
+              <button type="button" data-tmc-search-next aria-label="Next match" title="Next match (Enter)" disabled>↓</button>
+              <button type="button" data-tmc-search-close aria-label="Close search" title="Close search (Escape)">×</button>
+            </div>
+            <p data-tmc-search-status role="status"></p>
+            <small data-tmc-search-scope></small>
+          </section>
           <div class="tmc-chat-feed">
             <div class="tmc-chat-list" id="chatList">
               <article class="tmc-message tmc-message-system">
@@ -149,11 +160,40 @@
             </button>
           </div>
 
+          <section id="tmc-emote-panel" class="tmc-emote-picker" aria-labelledby="tmc-emote-title" data-tmc-emote-picker hidden>
+            <header class="tmc-emote-picker-header">
+              <h2 id="tmc-emote-title">Emotes</h2>
+              <p class="tmc-emote-context" data-tmc-emote-context></p>
+              <button type="button" class="tmc-auth-close" aria-label="Close emotes" data-tmc-emote-close>×</button>
+            </header>
+            <div class="tmc-emote-tools">
+              <label class="tmc-visually-hidden" for="emoteSearch">Search emotes</label>
+              <input id="emoteSearch" class="tmc-text-input" type="search" placeholder="Search emotes…" autocomplete="off" data-tmc-emote-search />
+            </div>
+            <p class="tmc-emote-notice" role="status" data-tmc-emote-notice></p>
+            <div class="tmc-emote-sections" data-tmc-emote-grid></div>
+            <button type="button" class="tmc-button tmc-button-secondary" data-tmc-emote-retry hidden>Try again</button>
+          </section>
+
+          <div class="tmc-reply-preview" data-tmc-reply-preview role="status" hidden>
+            <span data-tmc-reply-label></span>
+            <button type="button" aria-label="Cancel reply" data-tmc-reply-cancel>×</button>
+          </div>
+          <section class="tmc-completion" aria-label="Chat suggestions" data-tmc-completion hidden>
+            <p class="tmc-completion-status" role="status" data-tmc-completion-status></p>
+            <div id="tmc-completion-list" role="listbox" aria-label="Suggestions" data-tmc-completion-list></div>
+          </section>
           <form class="tmc-composer" id="composerForm">
+            <button type="button" class="tmc-button tmc-button-secondary" aria-label="Choose emote" title="Choose emote" aria-controls="tmc-emote-panel" aria-expanded="false" data-tmc-emote-open>☺</button>
             <input
               id="messageInput"
               type="text"
               autocomplete="off"
+              aria-label="Message"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="tmc-completion-list"
+              aria-expanded="false"
               placeholder="Write a manual chat command or message..."
             />
             <button class="tmc-button" type="submit">
@@ -165,39 +205,76 @@
         <aside class="tmc-pcg-panel">
           <div class="tmc-panel tmc-pcg-card">
             <div class="tmc-pcg-header">
-              <div>
-                <span class="tmc-section-kicker">PCG</span>
-                <h2>PokémonCommunityGame</h2>
-              </div>
+              <h2 title="PokémonCommunityGame">PCG</h2>
+              <p class="tmc-pcg-status" role="status" data-tmc-pcg-status>PCG: empty</p>
+              <details class="tmc-options-menu tmc-pcg-menu" data-tmc-pcg-menu>
+                <summary aria-label="PCG options" title="PCG options">•••</summary>
+                <div class="tmc-options-menu-content">
+                  <span class="tmc-section-kicker">PCG options</span>
+                  <p>Twitch sign-in for the game is separate from chat.</p>
+                  <button
+                    type="button"
+                    class="tmc-button tmc-button-secondary tmc-pcg-login-button"
+                    data-tmc-pcg-login
+                  >
+                    Sign in for PCG
+                  </button>
 
-              <div class="tmc-pcg-actions">
-                <p class="tmc-pcg-status" data-tmc-pcg-status>
-                  PCG: empty
-                </p>
-
-                <button
-                  type="button"
-                  class="tmc-button tmc-button-secondary tmc-pcg-login-button"
-                  data-tmc-pcg-login
-                >
-                  Sign in to Twitch for PCG
-                </button>
-
-                <button
-                  type="button"
-                  class="tmc-button tmc-button-secondary tmc-pcg-detach-button"
-                  data-tmc-pcg-detach
-                >
-                  Open PCG in a separate window
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    class="tmc-button tmc-button-secondary tmc-pcg-detach-button"
+                    data-tmc-pcg-detach
+                  >
+                    Open in separate window
+                  </button>
+                </div>
+              </details>
             </div>
 
+            <div class="tmc-pcg-sign-in" data-tmc-pcg-sign-in hidden>
+              <strong>Connect Twitch to PCG</strong>
+              <p data-tmc-pcg-sign-in-description>The game needs its own Twitch sign-in, separate from chat.</p>
+              <button type="button" class="tmc-button" data-tmc-pcg-login-quick>Sign in to Twitch for PCG</button>
+            </div>
             <div id="pcgHost" class="tmc-pcg-host"></div>
           </div>
         </aside>
       </section>
     </main>
+
+    <dialog id="tmc-login-dialog" class="tmc-auth-dialog" aria-labelledby="tmc-login-title"
+      aria-describedby="tmc-login-description" data-tmc-auth-dialog>
+      <div class="tmc-auth-dialog-card">
+        <header class="tmc-auth-dialog-header">
+          <span class="tmc-section-kicker" data-tmc-auth-step-label>Step 1 of 2</span>
+          <button type="button" class="tmc-auth-close" aria-label="Close login" data-tmc-auth-close>×</button>
+        </header>
+        <div class="tmc-auth-icon" aria-hidden="true">↗</div>
+        <h2 id="tmc-login-title" data-tmc-auth-title>Log in to Twitch</h2>
+        <p id="tmc-login-description" class="tmc-auth-description" data-tmc-auth-description>
+          Continue in your browser. Then come back here with your login code.
+        </p>
+        <section class="tmc-auth-step" data-tmc-auth-intro>
+          <button type="button" class="tmc-button tmc-auth-primary" data-tmc-auth-start>Login with Twitch</button>
+          <button type="button" class="tmc-auth-link" data-tmc-auth-have-code>I already have a code</button>
+          <p class="tmc-auth-note">For chat and saved accounts. PCG has its own Twitch sign-in.</p>
+        </section>
+        <form class="tmc-auth-step" data-tmc-auth-code-step hidden>
+          <label class="tmc-field-label" for="tmc-login-code">Login code</label>
+          <div class="tmc-auth-code-row">
+            <input id="tmc-login-code" class="tmc-text-input tmc-auth-code-input" type="password"
+              autocomplete="one-time-code" spellcheck="false" placeholder="Paste the code from your browser"
+              aria-describedby="tmc-login-feedback" data-tmc-auth-code />
+            <button type="button" class="tmc-button tmc-button-secondary" data-tmc-auth-paste>Paste code</button>
+          </div>
+          <button type="submit" class="tmc-button tmc-auth-primary" data-tmc-auth-finalize disabled>Complete login</button>
+          <button type="button" class="tmc-auth-link" data-tmc-auth-restart>Start again</button>
+        </form>
+        <p id="tmc-login-feedback" class="tmc-auth-feedback" role="status" aria-live="polite"
+          data-tmc-auth-feedback></p>
+      </div>
+    </dialog>
+
 
     <script type="module" src="/src/renderer.ts"></script>
   </body>

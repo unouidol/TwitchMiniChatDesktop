@@ -1,4 +1,8 @@
-﻿/**
+import type { TmcMessageFragment } from './TmcMessageContent';
+import type { TmcChatReply } from './TmcChatReply';
+import type { TmcChatAttention } from './TmcChatAttention';
+
+/**
  * Live Twitch chat connection states exposed across process boundaries.
  */
 export type TmcChatConnectionState =
@@ -51,6 +55,8 @@ export type TmcDisconnectLiveChatRequest = {
  * Request to send one explicit user-authored Twitch chat message.
  */
 export type TmcSendChatMessageRequest = {
+  readonly profileId: string;
+  readonly reply?: TmcChatReply;
   /**
    * Twitch channel login name without a leading hash.
    */
@@ -66,6 +72,11 @@ export type TmcSendChatMessageRequest = {
  * Live Twitch chat message delivered to the local renderer.
  */
 export type TmcLiveChatMessage = {
+  readonly badges?: readonly import('./TmcChatBadges').TmcChatBadge[];
+  readonly attention?: TmcChatAttention;
+  readonly color?: string;
+  readonly reply?: TmcChatReply;
+  readonly fragments?: readonly TmcMessageFragment[];
   /**
    * Stable message identifier for renderer-side de-duplication.
    */

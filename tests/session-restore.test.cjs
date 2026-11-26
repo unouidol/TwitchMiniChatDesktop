@@ -420,3 +420,58 @@ test('a successful new login persists before activation and returns only the ren
   assert.deepEqual((await store.loadSessions()).map((saved) => saved.profileId).sort(), ['A', 'B']);
   assert.equal((await handlers.get(channels.ACCOUNT_LIST)()).activeProfileId, 'B');
 });
+
+test('a stalled login request is bounded and leaves the selected saved account unchanged', async (context) => {
+  const store = await seed();
+  await initialize();
+  const before = await fs.readFile(store.getFilePath());
+  context.mock.method(AbortSignal, 'timeout', (milliseconds) => {
+    assert.equal(milliseconds, 10_000);
+    return AbortSignal.abort(new DOMException('Controlled login timeout', 'TimeoutError'));
+  });
+  context.mock.method(globalThis, 'fetch', async (destination, options) => {
+    assert.equal(destination, config.oauthFinalizeUrl);
+    options.signal.throwIfAborted();
+    assert.fail('An aborted request must not finalize login');
+  });
+  await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)({}, 'synthetic-claim-B'));
+  assert.equal((await handlers.get(channels.ACCOUNT_LIST)()).activeProfileId, 'A');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'A');
+  assert.deepEqual(await fs.readFile(store.getFilePath()), before);
+});
+
+test('login timeout interrupts a real loopback body before persistence or selection', async (context) => {
+  const store = await seed();
+  const controller = new AbortController();
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.write('{');
+  });
+  try {
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const url = `http://127.0.0.1:${server.address().port}/finalize`;
+    await initialize({ ...config, oauthFinalizeUrl: url });
+    const before = await fs.readFile(store.getFilePath());
+    context.mock.method(AbortSignal, 'timeout', (milliseconds) => {
+      assert.equal(milliseconds, 10_000);
+      return controller.signal;
+    });
+    let observedHeaders = false;
+    context.mock.method(globalThis, 'fetch', async (destination, options) => {
+      assert.equal(destination, url, 'Real HTTP is restricted to this loopback fixture');
+      assert.equal(JSON.parse(options.body).login_token, 'synthetic-claim-B');
+      const result = await nativeFetch(destination, options);
+      observedHeaders = true;
+      controller.abort(new DOMException('Controlled login body timeout', 'TimeoutError'));
+      return result;
+    });
+    await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)({}, 'synthetic-claim-B'));
+    assert.equal(observedHeaders, true);
+    assert.equal((await handlers.get(channels.ACCOUNT_LIST)()).activeProfileId, 'A');
+    assert.deepEqual(await fs.readFile(store.getFilePath()), before);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});

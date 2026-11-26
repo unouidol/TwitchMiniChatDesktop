@@ -97,6 +97,10 @@ export async function finalizeAccountRemoval({
         catch (error) {
           if (error.code !== 'ENOENT') throw error;
           console.error(`Application network evidence unavailable for ${phase}`);
+          const prefix = `${phase}-network.json.progress-`;
+          const snapshots = (await files.readdir(root)).filter((name) => name.startsWith(prefix) && /^\d+$/.test(name.slice(prefix.length)));
+          snapshots.sort((a, b) => Number(a.slice(prefix.length)) - Number(b.slice(prefix.length)));
+          if (snapshots.length) await files.copyFile(path.join(root, snapshots.at(-1)), path.join(evidence, `${phase}-network.progress.json`));
         }
       });
     }

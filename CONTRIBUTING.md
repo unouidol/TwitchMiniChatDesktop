@@ -6,6 +6,96 @@ The maintainer remains responsible for reviewing and accepting each change.
 
 ## Local setup and checks
 
+Search tests cover literal/Unicode/case matching, author and original emote-code
+lookup, both navigation directions, live arrivals without navigation, draft
+preservation, bounded retention/eviction disclosure and reset/dispose. Synthetic
+Electron uses native Ctrl+F, Enter/Shift+Enter/Escape, checks actual emote/link
+node identity remains unchanged, treats HTML/regex-looking queries literally,
+and verifies live results, account/channel reset, native PCG bounds and no sends.
+A held-history response with an actual live IRC arrival proves history commit
+removes temporary/detached search results before replacing the feed.
+
+Badge coverage validates bounded IRC/structured metadata, deduplication, strict
+CDN URLs, channel overrides, request sharing/cache, stale account/token rejection,
+provider identity/HTTP failures and cooldown. Renderer tests register 5000 rows
+with a bounded pending index and verify reset/dispose reject late results.
+Synthetic Electron uses actual main HTTP/IRC/IPC and renderer code with loopback
+catalogs and substituted image delivery; it checks history/live images, missing
+metadata, unknown-label and broken-image fallback, account switching, unchanged
+native PCG and no sends. No real badge/provider/CDN transport is used by tests.
+The full synthetic Electron process has a 180-second watchdog to cover the
+expanded auth/chat/appearance/badge scenario on Windows. Individual production
+request deadlines, assertion timeouts and ownership/network guards are unchanged.
+
+Appearance coverage exercises legacy defaults without read-side writes,
+serialized concurrent channel/appearance updates, fresh-store persistence,
+invalid payloads, failed writes and corrupt-file preservation. Synthetic Electron
+changes font size and spacing without rebuilding rows or changing draft/account/
+channel/native PCG state, runs the remaining chat interactions with those settings,
+and verifies them again after a full process restart.
+Timestamp checks cover migration of existing appearance choices and persistence;
+the synthetic UI hides/restores history/live times without losing datetime,
+font/density or native PCG state, then verifies hidden state after restart.
+Layout comparisons first require selected PCG identity, DOM-host bounds and the
+independently sampled native view to agree on two observations. This excludes
+an account-transition snapshot from the baseline without weakening the exact
+before/after bounds and native-view identity assertion.
+
+Reply coverage includes real IRC serialization/parsing against substituted
+WebSocket transport, injection/preview bounds, active-profile/channel checks and
+trusted send IPC origin/frame validation. The Windows synthetic UI scenario
+also selects/cancels/sends a reply, displays incoming parent context and checks
+that account/channel changes clear selection and restart never replays sends.
+These checks use local fixtures, not a real Twitch delivery acknowledgment.
+Emote favorites tests cover 24-item FIFO insertion (reuse preserves position),
+tail eviction, per-account/channel behavior, serialized concurrent writes,
+restart persistence, stale entitlement and corrupt/unwritable storage. The
+synthetic Electron picker checks section order, unified search, no usage from
+unsent selections, channel/global favorites, account isolation and a fresh
+process reading the saved favorites. All transports remain local substitutes.
+Picker search also checks direct global matches, unique results across favorites
+and their original section, one empty result, and section restoration on clear.
+Color coverage rejects non-RGB/CSS metadata, preserves actual provider colors,
+uses stable per-username fallbacks and resets own USERSTATE color on reconnect.
+Synthetic UI checks compare history/live/local-echo colors and verify both hover
+and keyboard reveal/activation for Reply; no real user-color API calls are made.
+Missing-color lookup tests cover batched login/ID resolution, positive/negative
+cache expiry, token/account isolation, stale completion, response identity/CSS
+validation, failure cooldown and shared request/body deadlines. Renderer tests
+exercise 5000 new authors with bounded batches and no full-DOM scanning, additional
+messages during a pending lookup, live-tag precedence and reset/dispose cleanup.
+Synthetic Electron history with missing red/yellow bot colors resolves through
+the actual trusted IPC and main service using loopback HTTP substitutes; reload
+reuses cache, unset colors retain their fallback and existing tags stay intact.
+Chat-link tests cover punctuation/Unicode, bracket balancing, raw/canonical URL
+bounds, oversized prose tails, link-count budgets, inert unsupported schemes,
+trusted main-frame validation, OS-boundary failures and local-window navigation
+guards. Synthetic Electron verifies history/live links alongside emotes, trusted
+primary/middle/keyboard activation, inert programmatic events, explicit retry
+and unchanged local-window URL/handles. Only the OS browser boundary is replaced;
+no real browser or remote destination is opened and network guards stay active.
+Autocomplete unit coverage exercises token boundaries, collapsed caret rules,
+Unicode/middle-word edits, participant bounds, exact emote code insertion,
+availability, prefix/favorites ranking and option deduplication. Synthetic
+Electron checks history/live mention sources, native Tab/Enter/arrows/click,
+punctuation acceptance without reopening, preserved input history/draft, IME
+events, Escape/reply precedence, panel exclusivity and unchanged native PCG.
+A held loopback catalog response across account/channel changes proves stale
+results are ignored and selections never send/replay. Unicode entry substitutes
+only the paste input boundary because ChromeDriver cannot type non-BMP text.
+Mention coverage checks whole-word/case/Unicode boundaries, URL/email exclusions,
+self-message exclusion and authoritative reply recipient IDs. History IPC tests
+exercise trusted senders, account-specific results and stale account/token
+rejection across a pending real history load with substituted HTTP. Synthetic
+Electron checks history/live mentions, replies without textual mentions,
+conflicting reply identities, cycling/focus, unchanged drafts and paused scroll,
+account/channel reset and unchanged native PCG. The counter describes loaded
+matches, not unread messages; detection/navigation never sends chat.
+Network guards publish their completed report once; sparse, immutable progress
+snapshots avoid Windows errors replacing files held by scanners/readers. Failure
+cleanup retains the latest partial snapshot under a distinct progress name;
+partial reports never satisfy completed-network-evidence acceptance checks.
+
 Use Node **24.18.0** with its bundled npm **11.16.0**, matching the CI runtime.
 In a fresh Windows checkout, run:
 
@@ -128,6 +218,136 @@ disconnected during this session. These observations do not establish offline
 retention, real-account removal, or PCG retention/resource behavior.
 
 ## Electron E2E (synthetic)
+
+Emote catalog tests cover token/user validation, pagination and malformed data,
+missing personal scope, account/token/channel cache isolation, expiry, stale
+results, bounded concurrency, trusted IPC senders and request/body cancellation.
+The picker E2E closes/reopens while a catalog is pending, checks category/search,
+locked entries, caret insertion without send, cache reuse, account-switch scope
+fallback and explicit sending with a decorated local echo. The inline revision
+also verifies no native modal, bounded layout between messages and composer, readable chat space,
+unchanged visible PCG bounds/identity, chat interaction, composer edits while the
+panel stays open and repeated insertion. Focused scroll-owner regressions check
+following the latest versus preserving an older reading position on panel resize.
+The test bootstrap
+maps only the fixed Twitch validate/Helix HTTP endpoints to the authenticated
+synthetic loopback fixture before passing transport to the unchanged guards;
+real Twitch/CDN services remain inaccessible. Fixture gates are released during
+shutdown. Real permission availability must be checked separately with the user.
+On2026-11-18 version1.1.0-dev.2 passed101/101 unit tests, typecheck, zero-warning
+lint, whitespace checks and the full isolated Electron scenario. Native picker
+bounds/identity and synthetic screenshots were checked. Windows observation now
+uses bounded immutable numbered snapshots to avoid replacing a file held by a
+reader; the scenario waits for actual restart chat readiness before shutdown.
+Owned processes/profiles were removed. Experimental module-mocking and existing
+Electron diagnostics remain visible. Real personal-scope authorization, hosted
+CI and packaging are not established by these local results.
+The integrated-panel follow-up1.1.0-dev.3 passed103/103 tests, typecheck,
+zero-warning lint, whitespace checks and the full Electron scenario on2026-11-18.
+The picker has no modal/backdrop, keeps at least180px of message space in the
+tested desktop geometry, leaves native PCG bounds unchanged, and supports editing
+the composer and selecting repeatedly while open. Test screenshots were visually
+inspected and owned profiles/processes removed. Hosted/package/user-assisted
+personal-scope checks remain separate.
+The placement adjustment1.1.0-dev.4 moves that same panel below the message feed,
+immediately above the composer. The full Electron scenario now asserts that
+message/picker/composer rectangles do not overlap and Send remains in the visible
+viewport. It passed on2026-11-18, along with the three focused version/scroll
+tests; the synthetic screenshot was inspected. No catalog/auth behavior changed.
+
+Twitch emote coverage includes received IRC and backend history, repeated/adjacent
+emotes, Unicode code-point ranges, exact whitespace, ACTION bodies, invalid IDs,
+conflicting ranges and metadata limits. The Electron scenario exercises real
+main normalization, preload and shared DOM rendering; only image delivery is
+substituted at the image src boundary with an inert synthetic SVG and a broken
+image. CDN URLs are validated by the unit tests, guards/CSP are unchanged, and
+the synthetic run makes no Twitch/CDN requests. Error fallback and literal HTML
+text are asserted. Real Twitch delivery and the catalog need separate evidence.
+The history fixture now uses the actual backend `emotes` field, alongside unit
+coverage for null emotes and the older emotes_raw/emotesRaw aliases. A normal
+development diagnostic on2026-11-18 inspected only schema/counts, established that
+the real endpoint uses `emotes`, and recognized83 occurrences after the alias
+fix. The user then confirmed real history emote images were visible. Temporary
+schema logging was removed. This does not establish live-chat/outgoing/catalog
+behavior. That correction used package1.1.0-dev.1; the picker increment uses
+1.1.0-dev.2. Title/header compilation stamps and their agreement receive focused
+unit and Electron coverage. No dependencies or package identity were changed.
+The correction passed85/85 unit tests, typecheck, zero-warning lint, whitespace
+checks and the complete isolated Electron scenario on2026-11-18. The user-assisted
+history check passed separately; hosted CI and packaging remain unperformed.
+Local verification on 2026-11-18: 82/82 unit tests passed, including history text
+alias fallback with preserved whitespace; the full Electron UI/restart scenario
+passed with received/history emotes and synthetic image success/failure. Owned
+profiles/processes were cleaned. A separate unauthenticated HEAD request to the
+fixed public Twitch CDN URL for emote25 returned200 image/png. This does not prove
+real chat delivery, catalog authorization or hosted CI. Experimental mocking
+warnings remain visible.
+
+The production renderer login dialog is also exercised in the isolated Electron
+scenario: progressive steps, browser-launch failure and retry, clipboard denial
+and keyboard fallback, expired claim, a stalled body reaching the production
+ten-second deadline and returning editable controls, reset/cancel, late clipboard completion,
+successful paste/finalization and duplicate-submit controls. Only OS browser
+launch and clipboard reads are substituted; production IPC, session persistence
+and account notification use the loopback fixture. No real browser or system
+clipboard is accessed. The test checks native PCG bounds while the modal is open
+and captures synthetic step screenshots locally. These checks do not establish
+real Twitch OAuth completion or packaged-app behavior.
+
+The header/channel E2E checks the compact header, account-options dismissal with
+Escape and outside click, confirmed removal from that menu, navigation with Open
+and Enter, and the updated channel label. A draft different channel must not
+retarget history refresh, favorites or the single synthetic IRC message. All
+transports remain loopback-only; fixture messages never reach Twitch.
+Read-only bootstrap observation also verifies zero native PCG bounds while the
+account menu is open and visible bounds after Escape, with the same webContents
+identity retained. The observation timer is released on window close/app quit.
+
+PCG menu coverage uses the same inert loopback panel: controls are hidden until
+the menu is opened, native bounds become zero without changing view identity,
+Escape/outside click restore the panel, and the actual separate-window action
+opens a local child window. Closing it restores the retained embedded view.
+The game-specific Twitch login button is checked for visibility/availability;
+automated checks do not click it or contact Twitch authentication.
+On 2026-11-18 the PCG menu revision passed the full Electron scenario including
+native view identity and detached-window return, plus 52/52 unit tests,
+typecheck, zero-warning lint and whitespace checks using Node 24.18.0/npm
+11.16.0. Owned processes and the temporary profile were removed; the existing
+module-mocking warning remains. Independent review found no confirmed defect.
+Real PCG sign-in, hosted CI for this revision and packaged behavior remain
+unverified.
+
+Conditional PCG sign-in regressions distinguish absent/persisted browser-session
+evidence per account, cookie sign-in/logout/expiry, lookup errors, obsolete
+queries/activations and destroyed/replaced view cleanup. Synthetic cookie objects
+throw if their values are accessed. The Electron fixture seeds only B's temporary
+PCG partition with a synthetic browser cookie: A shows the explicit prompt, B
+hides it, and B's evidence persists across restart. Parent-runner commands change
+only that synthetic cookie through the test bootstrap, allowing a same-account
+logout/return check and a fixed-height native-host positioning regression. They
+do not add production IPC or perform real Twitch authentication.
+On 2026-11-18 the conditional prompt passed 59/59 unit tests and the complete
+isolated Electron scenario, including persisted session evidence after restart,
+account-specific prompt visibility and same-account cookie removal/restoration.
+The first real teardown probe exposed a cleared WebContentsView getter; cleanup
+now captures its contents owner, with a regression and passing shutdown/profile
+removal evidence. Review also prompted explicit position synchronization when
+prompt visibility changes. Native screenshots were inspected. Provider session
+validity and PCG consent remain outside this cookie-presence check; real PCG
+login and hosted CI for this revision remain unverified.
+
+Local guided-login verification on 2026-11-18 used Node 24.18.0 and npm 11.16.0:
+`npm test` passed 52/52, typecheck and zero-warning lint passed, and the complete
+Electron scenario passed including the ten-second stalled-body recovery and
+account-removal/restart checks. Owned temporary profiles/processes were cleaned
+up. Independent defect review's modal-blocking finding was corrected and
+re-reviewed with no further confirmed finding. The experimental module-mocking
+warning remains. The user subsequently confirmed that the guided real-login
+flow worked in the development app. The header/channel revision also passed
+52/52 unit tests, typecheck, zero-warning lint and the complete Electron scenario,
+including direct native-menu bounds/identity observations. Its manual layout
+check and hosted CI remain pending. Earlier broader account tests concern the
+previous interface.
 
 On Windows x64 with Node 24.18.0 and PowerShell 7, install dependencies with
 `npm ci`, provision the driver as described below, then run `npm run test:e2e`.
@@ -421,6 +641,49 @@ RunAsNode only for its child-launch environment and restores the parent setting.
 Install/runtime warnings and dependency findings remain open; E2E is not an audit.
 This is functional synthetic encryption/removal evidence, not real Twitch login,
 backend correctness, cryptographic assurance, or PCG retention/lifecycle coverage.
+
+## Git workflow
+
+The coding agent owns routine repository organization under the standing
+delegation in [AGENTS.md](AGENTS.md#git-ownership-and-repository-maintenance).
+Use a lightweight branch/PR workflow rather than adding permanent branches for
+each development stage. `main` is the currently documented integration branch;
+verify the actual remote target and existing PR dependencies before publishing.
+This policy does not assert that remote branch protections are configured.
+
+1. Inspect local changes, staged content, upstream divergence and relevant PRs.
+   Fetch remote refs when needed; do not blindly pull into a dirty working tree.
+2. Choose or create a descriptive `codex/<topic>` branch from the verified base.
+   Preserve unrelated work; use an isolated worktree when simultaneous work
+   requires it. Avoid duplicate PRs for the same patch or accidental stacked PRs.
+3. Implement one coherent change and run checks appropriate to its scope. Review
+   the intended staged changes and checkpoint validated increments with useful
+   English commit messages. Preserve test/doc changes with the behavior they cover.
+4. Push the feature branch normally and open/update a draft PR using the existing
+   template. Record the concrete behavior, dependency order, tests, diagnostics
+   and unperformed acceptance checks. A draft can hold incomplete work, clearly
+   labelled; it is not merge approval or a claim of passing verification.
+5. Before integration, verify the PR's final head/base, diff, independent review
+   and required hosted checks, including Windows E2E for relevant app changes.
+   Revalidate after conflicts or code/base changes invalidate earlier evidence.
+   Local success alone never establishes hosted CI or real-login/release behavior.
+6. With explicit integration authorization, merge using the repository's accepted
+   strategy. Then synchronize safely and remove verified completed branches only
+   after checking for unpublished work and dependent PRs/worktrees. Keep releases
+   traceable to their exact source commit; never move published version tags.
+
+For a regression in shared history, prefer a small corrective commit or reviewed
+revert. A failed check, unrelated dirty file or old branch is not a reason to
+discard work, rewrite published history, force a push or change repository policy.
+Do not mass-delete existing branches merely to reduce the branch count.
+
+This workflow adapts the official [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow)
+and [Pro Git contribution guidance](https://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project).
+The [Pro Git rebasing guidance](https://git-scm.com/book/en/v2/Git-Branching-Rebasing)
+explains the risk of rewriting commits other work already depends on.
+[Protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+can enforce review and status checks; configuring them is a separate authorized
+repository change, not something this documentation enables automatically.
 
 ## Review and completion
 

@@ -1,0 +1,157 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+
+export async function exerciseEmotePicker(browser, fixture, evidence, readNativeViews, resizeOwnedWindow) {
+  const trigger = await browser.$('[data-tmc-emote-open]');
+  const panel = await browser.$('[data-tmc-emote-picker]');
+  const input = await browser.$('#messageInput');
+  const search = await browser.$('[data-tmc-emote-search]');
+  const nativeBefore = await readNativeViews();
+  await input.setValue('hello world');
+  await browser.execute("document.querySelector('#messageInput').setSelectionRange(5, 5)");
+  fixture.holdEmoteCatalog();
+  await trigger.click();
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-emote-notice]').getText()).includes('Loading'));
+  await browser.keys('Escape');
+  await panel.waitForDisplayed({ reverse: true });
+  await trigger.click();
+  await panel.waitForDisplayed();
+  assert.deepEqual(await readNativeViews(), nativeBefore, 'Integrated picker leaves native PCG visible and unchanged');
+  const geometry = await browser.execute(`
+    const panel = document.querySelector('[data-tmc-emote-picker]').getBoundingClientRect();
+    const feed = document.querySelector('.tmc-chat-feed').getBoundingClientRect();
+    const chat = document.querySelector('.tmc-chat').getBoundingClientRect();
+    const composer = document.querySelector('#composerForm').getBoundingClientRect();
+    return { panelTop: panel.top, panelBottom: panel.bottom, feedBottom: feed.bottom, feedHeight: feed.height,
+      composerTop: composer.top, composerBottom: composer.bottom, viewportHeight: window.innerHeight,
+      panelHeight: panel.height, chatHeight: chat.height, modals: document.querySelectorAll(':modal').length };
+  `);
+  assert.equal(geometry.modals, 0);
+  assert.ok(geometry.feedBottom <= geometry.panelTop + 1, 'Messages stay above the emote picker');
+  assert.ok(geometry.panelBottom <= geometry.composerTop + 1, 'Picker stays above the composer without covering it');
+  assert.ok(geometry.composerBottom <= geometry.viewportHeight + 1, 'Composer and Send stay on screen');
+  assert.ok(geometry.feedHeight >= 180, 'Messages remain readable while picker is open');
+  assert.ok(geometry.panelHeight <= geometry.chatHeight * 0.4 + 1);
+  const originalSize = await resizeOwnedWindow(960, 650);
+  try {
+    await browser.waitUntil(async () => (await browser.execute('return innerWidth')) <= 960);
+    const minimum = await browser.execute(`return {
+      width: innerWidth, scrollWidth: document.documentElement.scrollWidth,
+      right: document.querySelector('.tmc-pcg-panel').getBoundingClientRect().right,
+      composerBottom: document.querySelector('#composerForm').getBoundingClientRect().bottom,
+      height: innerHeight, feedHeight: document.querySelector('.tmc-chat-feed').getBoundingClientRect().height,
+      pickerHeight: document.querySelector('[data-tmc-emote-picker]').getBoundingClientRect().height
+    }`);
+    assert.ok(minimum.scrollWidth <= minimum.width && minimum.right <= minimum.width + 1, 'The true minimum client viewport fits the complete shell and native host');
+    assert.ok(minimum.composerBottom <= minimum.height + 1 && minimum.feedHeight >= 180 && minimum.pickerHeight >= 100,
+      'Messages, picker controls and Send remain usable at the true outer-window minimum');
+  } finally { await resizeOwnedWindow(originalSize.width, originalSize.height); }
+  fixture.releaseEmoteCatalog();
+  await browser.waitUntil(async () => (await browser.$$('[data-tmc-emote-section]')).length === 4);
+  assert.deepEqual(await browser.execute("return Array.from(document.querySelectorAll('[data-tmc-emote-section]'), (section) => section.dataset.tmcEmoteSection)"), ['favorites', 'channel', 'personal', 'global']);
+  assert.equal((await browser.$$('[data-tmc-emote-category]')).length, 0, 'Sections share one page without category tabs');
+  await browser.$('.tmc-emote-choice[aria-label="Keepo"]').waitForDisplayed();
+  assert.equal(await search.isFocused(), true);
+  await browser.$('#chatList').click();
+  assert.equal(await panel.isDisplayed(), true, 'Reading chat does not dismiss the panel');
+  await input.setValue('new message');
+  await browser.execute("document.querySelector('#messageInput').setSelectionRange(3, 3)");
+  await search.setValue('Keep');
+  await browser.waitUntil(async () => (await browser.$$('.tmc-emote-choice')).length === 1);
+  assert.equal((await browser.$$('[data-tmc-emote-grid] h3')).length, 0, 'Search results have no category headings');
+  assert.equal((await browser.$$('.tmc-emote-section-empty')).length, 0, 'Matching search has no empty categories');
+  await search.setValue('Kappa');
+  await browser.waitUntil(async () => (await browser.$$('.tmc-emote-choice')).length === 1);
+  assert.equal(await browser.$('.tmc-emote-choice').getAttribute('aria-label'), 'Kappa', 'Global matches appear directly');
+  await search.setValue('no-such-emote');
+  await browser.waitUntil(async () => (await browser.$$('.tmc-emote-choice')).length === 0);
+  assert.equal((await browser.$$('.tmc-emote-section-empty')).length, 1, 'Empty search shows just one empty result message');
+  await search.click();
+  await browser.keys(['Control', 'a']);
+  await browser.keys('Backspace');
+  await browser.waitUntil(async () => (await browser.$$('.tmc-emote-choice')).length === 4);
+  assert.equal(await browser.$('.tmc-emote-choice[aria-label^="Locked"]').isEnabled(), false);
+  await browser.saveScreenshot(path.join(evidence, 'emote-picker.png'));
+  await browser.$('.tmc-emote-choice[aria-label="Keepo"]').click();
+  assert.equal(await panel.isDisplayed(), true, 'Picker remains open for repeated selection');
+  assert.equal(await input.getValue(), 'new Keepo message');
+  assert.equal(await input.isFocused(), true);
+  await browser.$('.tmc-emote-choice[aria-label="Keepo"]').click();
+  assert.equal(await input.getValue(), 'new Keepo Keepo message');
+  assert.equal(fixture.sentMessages.length, 1, 'Choosing an emote must not send a chat message');
+  assert.equal((await browser.$$('[data-tmc-emote-section="favorites"] .tmc-emote-choice')).length, 0, 'Unsent choices do not populate favorites');
+  const requests = fixture.emoteCalls.length;
+  await trigger.click();
+  await panel.waitForDisplayed({ reverse: true });
+  assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+  await trigger.click();
+  await browser.$('.tmc-emote-choice[aria-label="Keepo"]').waitForDisplayed();
+  assert.equal(fixture.emoteCalls.length, requests, 'Same-account reopen uses the temporary catalog store');
+  await browser.keys('Escape');
+  await panel.waitForDisplayed({ reverse: true });
+  assert.equal(await input.isFocused(), true);
+  await trigger.click();
+  await browser.$('.tmc-emote-choice[aria-label="Keepo"]').waitForDisplayed();
+  await input.setValue('Keepo');
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected');
+  await browser.$('#composerForm button[type="submit"]').click();
+  await browser.$('[data-tmc-emote-section="favorites"] .tmc-emote-choice[aria-label="Keepo"]').waitForDisplayed();
+  assert.equal(fixture.sentMessages.length, 2);
+  await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
+  await panel.waitForDisplayed({ reverse: true });
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-a'));
+  await browser.$('#openChannelButton').waitForEnabled();
+  await trigger.click();
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-emote-notice]').getText()).includes('not enabled'));
+  assert.equal((await browser.$$('[data-tmc-emote-section="personal"] .tmc-emote-choice')).length, 0, 'A must not receive B personal emotes');
+  assert.equal((await browser.$$('[data-tmc-emote-section="favorites"] .tmc-emote-choice')).length, 0, 'A must not receive B favorites');
+  assert.equal((await browser.$$('.tmc-emote-choice[aria-label="BWave"]')).length, 0);
+  await browser.$('.tmc-emote-choice[aria-label="Kappa"]').waitForDisplayed();
+  await browser.$('[data-tmc-emote-close]').click();
+  await input.setValue('');
+  await trigger.click();
+  await browser.$('.tmc-emote-choice[aria-label="Kappa"]').click();
+  assert.equal(await input.getValue(), 'Kappa ');
+  assert.equal(fixture.sentMessages.length, 2);
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected');
+  await browser.$('#composerForm button[type="submit"]').click();
+  await browser.$('.tmc-message-self img[alt="Kappa"]').waitForDisplayed();
+  assert.equal(await browser.execute("return getComputedStyle(document.querySelector('.tmc-message-self strong')).color"), 'rgb(255, 127, 80)', 'Own local echo uses the current account USERSTATE color');
+  await browser.$('[data-tmc-emote-section="favorites"] .tmc-emote-choice[aria-label="Kappa"]').waitForDisplayed();
+  assert.equal(fixture.sentMessages.length, 3);
+  assert.equal(await panel.isDisplayed(), true, 'Explicit sending does not close the integrated panel');
+  await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'B');
+  await panel.waitForDisplayed({ reverse: true });
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-b'));
+  await browser.$('#openChannelButton').waitForEnabled();
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-live-status]').getText()) === 'Live: connected');
+  await trigger.click();
+  await browser.$('[data-tmc-emote-section="favorites"] .tmc-emote-choice[aria-label="Keepo"]').waitForDisplayed();
+  const favorites = () => browser.execute("return Array.from(document.querySelectorAll('[data-tmc-emote-section=\"favorites\"] .tmc-emote-choice'), (button) => button.getAttribute('aria-label'))");
+  assert.deepEqual(await favorites(), ['Keepo']);
+  await input.setValue('Kappa');
+  await browser.$('#composerForm button[type="submit"]').click();
+  await browser.waitUntil(async () => JSON.stringify(await favorites()) === '["Kappa","Keepo"]');
+  await input.setValue('Keepo');
+  await browser.$('#composerForm button[type="submit"]').click();
+  await browser.waitUntil(async () => fixture.sentMessages.length === 5 && (await input.getValue()) === '');
+  assert.deepEqual(await favorites(), ['Kappa', 'Keepo'], 'Reusing an existing emote never changes favorite order');
+  await browser.saveScreenshot(path.join(evidence, 'emote-favorites.png'));
+  await search.setValue('Keep');
+  assert.equal((await browser.$$('.tmc-emote-choice')).length, 1, 'Favorite/channel duplicates merge into one result');
+  assert.equal((await browser.$$('[data-tmc-emote-grid] h3')).length, 0);
+  await search.setValue('Kappa');
+  assert.equal((await browser.$$('.tmc-emote-choice')).length, 1, 'Favorite/global duplicates merge into one result');
+  await browser.saveScreenshot(path.join(evidence, 'emote-search.png'));
+  await search.click();
+  await browser.keys(['Control', 'a']);
+  await browser.keys('Backspace');
+  assert.equal((await browser.$$('[data-tmc-emote-section]')).length, 4, 'Clearing search restores the ordered sections');
+  await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'A');
+  await panel.waitForDisplayed({ reverse: true });
+  await browser.waitUntil(async () => (await browser.$('[data-tmc-account-status]').getText()).includes('fixture-a'));
+  await browser.$('#openChannelButton').waitForEnabled();
+  await trigger.click();
+  await browser.$('[data-tmc-emote-section="favorites"] .tmc-emote-choice[aria-label="Kappa"]').waitForDisplayed();
+  assert.deepEqual(await favorites(), ['Kappa']);
+}

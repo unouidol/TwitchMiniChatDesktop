@@ -21,6 +21,16 @@ import { registerBackendIpcHandlers } from './registerBackendIpcHandlers';
 import { registerChatIpcHandlers } from './registerChatIpcHandlers';
 import { registerPcgIpcHandlers } from './registerPcgIpcHandlers';
 import { registerSettingsIpcHandlers } from './registerSettingsIpcHandlers';
+import { registerEmoteIpcHandlers } from './registerEmoteIpcHandlers';
+import { TmcEmoteCatalogService } from '../chat/TmcEmoteCatalogService';
+import { TmcUserColorService } from '../chat/TmcUserColorService';
+import { registerUserColorIpcHandlers } from './registerUserColorIpcHandlers';
+import { registerChatLinkIpcHandlers } from './registerChatLinkIpcHandlers';
+import { chatAttention } from '../../shared/chat/TmcChatAttention';
+import { TmcBadgeCatalogService } from '../chat/TmcBadgeCatalogService';
+import { registerBadgeIpcHandlers } from './registerBadgeIpcHandlers';
+import { JsonFileStore } from '../storage/JsonFileStore';
+import path from 'node:path';
 
 /**
  * Registers application-level Inter-Process Communication handlers.
@@ -64,7 +74,18 @@ export async function registerIpcHandlers(
     return 'pong';
   });
 
-  const chatController = registerChatIpcHandlers(runtimeConfig, accountRegistry);
+  const emoteCatalog = new TmcEmoteCatalogService(() => accountRegistry.getActiveSession(),
+    new JsonFileStore<unknown>(path.join(app.getPath('userData'), 'tmc-emote-favorites.json'), { version: 1, profiles: [] }));
+  registerEmoteIpcHandlers(emoteCatalog);
+  registerUserColorIpcHandlers(new TmcUserColorService(() => accountRegistry.getActiveSession()));
+  registerChatLinkIpcHandlers();
+  registerBadgeIpcHandlers(new TmcBadgeCatalogService(() => accountRegistry.getActiveSession()));
+  const chatController = registerChatIpcHandlers(runtimeConfig, accountRegistry, (message) => ({
+    ...message,
+    ...(message.isSelf && message.id.startsWith('local-self-') ? { fragments: emoteCatalog.outgoingFragments(message) } : {}),
+    attention: chatAttention({ ...message, author: message.username }, accountRegistry.getActiveSession()),
+  }),
+    (profileId, message) => emoteCatalog.recordSent(profileId, message));
   registerAccountIpcHandlers(accountRegistry, authSessionStore, {
     runtimeConfig,
     secureAuthSessionStore,
@@ -84,7 +105,7 @@ export async function registerIpcHandlers(
     accountChannelStore,
   });
   registerSettingsIpcHandlers();
-  registerBackendIpcHandlers(runtimeConfig, authSessionStore);
+  registerBackendIpcHandlers(runtimeConfig, authSessionStore, accountRegistry);
 }
 
 async function restoreSavedDesktopSessions(
