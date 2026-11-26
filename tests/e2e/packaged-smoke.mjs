@@ -33,6 +33,14 @@ const root = await fs.mkdtemp(path.join(project, '.test-build', 'packaged-smoke-
 await fs.writeFile(path.join(root, 'owner'), 'tmc-packaged-smoke');
 const profile = path.join(root, 'profile');
 await fs.mkdir(profile);
+// A stable artifact would otherwise contact GitHub on first startup. Exercise
+// its real persisted daily cooldown, not a production bypass or alternate build.
+// Cold-start scheduling and HTTP behavior have separate main-composition tests.
+const stableBuild = /^\d+\.\d+\.\d+$/.test(metadata.version);
+const recentCheck = stableBuild ? Date.now() : null;
+if (stableBuild) await fs.writeFile(path.join(profile, 'welcome.json'), JSON.stringify({
+  seenVersion: null, noticedVersion: null, release: null, lastAttempt: recentCheck,
+}));
 const environment = { ...process.env };
 for (const key of Object.keys(environment)) if (key.startsWith('TMC_') || key.startsWith('ELECTRON_') || key === 'NODE_OPTIONS') delete environment[key];
 environment.TMC_BACKEND_BASE_URL = 'http://127.0.0.1:9';
@@ -40,7 +48,7 @@ environment.TMC_OAUTH_START_URL = 'http://127.0.0.1:9/oauth/start';
 let browser, driver, application;
 const children = new Set();
 const result = { passed: false, version: metadata.version, binary, archiveSha256: createHash('sha256').update(await fs.readFile(archive)).digest('hex'),
-  files, fuses, launches: [], profileRemoved: false };
+  files, fuses, stableUpdateCooldownSeed: recentCheck, launches: [], profileRemoved: false };
 const alive = (pid) => {
   try { process.kill(pid, 0); return true; }
   catch (error) { if (error.code !== 'ESRCH') throw error; return false; }
@@ -108,8 +116,8 @@ async function launch() {
   await browser.$('[data-tmc-auth-login]').waitForClickable({ timeout: 15000 });
   const state = await browser.execute(async () => {
     const shell = globalThis.window;
-    return Promise.all([shell.tmc.ping(), shell.tmc.accounts.list(), shell.tmc.settings.get(), shell.tmc.player.getStatus()]).then(
-      ([ping, accounts, settings, player]) => ({ ping, accounts, settings, player, node: typeof shell.require, process: typeof shell.process,
+    return Promise.all([shell.tmc.ping(), shell.tmc.accounts.list(), shell.tmc.settings.get(), shell.tmc.player.getStatus(), shell.tmc.welcome.getState()]).then(
+      ([ping, accounts, settings, player, welcome]) => ({ ping, accounts, settings, player, welcome, node: typeof shell.require, process: typeof shell.process,
         styles: shell.getComputedStyle(shell.document.querySelector('.tmc-shell')).display }),
       (error) => ({ error: String(error) }));
   });
@@ -117,6 +125,10 @@ async function launch() {
   assert.equal(state.node, 'undefined'); assert.equal(state.process, 'undefined');
   assert.deepEqual(state.accounts.accounts, []); assert.equal(state.accounts.activeProfileId, null);
   assert.equal(state.styles, 'flex'); assert.equal(state.player.state, 'closed');
+  assert.equal(state.welcome.installedVersion, metadata.version);
+  assert.equal(state.welcome.automaticChecks, stableBuild);
+  assert.equal(state.welcome.lastAttempt, recentCheck);
+  assert.equal(state.welcome.checkState, 'never', 'Packaged smoke must not request live release metadata');
   await browser.waitUntil(async () => (await browser.$('#chatList').getText()).includes('Use Login to sign in'));
   assert.equal((await browser.$('#chatList').getText()).includes('Error invoking'), false, 'First launch guides login instead of requesting authenticated history');
   assert.match(await browser.getTitle(), new RegExp(metadata.version.replaceAll('.', '\\.')));
