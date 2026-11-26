@@ -103,29 +103,16 @@ Account/auth/channel/history resets clear the query/index/highlights and close
 the panel; disposal releases all listeners and row references. Ctrl+F does not
 move focus behind an open login dialog. PCG remains a separate native surface.
 
-Twitch badge identities come only from supplied PRIVMSG/USERSTATE tags or a
-history badges field (IRC string or structured set/version entries). They are
-bounded and deduplicated; missing metadata never becomes a guessed role. Own
-USERSTATE badges reset on every connection. TmcBadgeCatalogService validates the
-initiating OAuth identity, resolves the exact channel login, and combines Helix
-global/channel chat badge definitions with channel versions taking precedence.
-Fixed endpoints reject redirects; image URLs must match the fixed Twitch badge
-CDN path. A single ten-second deadline covers requests and bodies. Cache entries
-are profile/token/channel-scoped, at most eight contexts, with four concurrent
-loads; successful definitions last 30 minutes and failures back off 30 seconds.
-Stale account/token completions are rejected without changing authentication.
-The explicit CHAT_BADGES IPC accepts only the trusted local main frame and
-returns public definitions, never credentials or raw provider responses.
-
-The channel controller owns TmcChatBadgeController and supplies newly rendered
-author nodes. It retains at most 1000 pending containers, never rescans growing
-history and requests a catalog only when supplied badge metadata needs it.
-Renderer definitions expire after five minutes when new rows arrive; failures retain
-text labels for 30 seconds. Account/auth/channel/history resets and pagehide
-invalidate pending results and release references. Fixed-size, lazy images have
-plain-text titles and a text fallback on failure; badge layout changes notify
-the existing scroll owner. No badge selection, moderation action or new chat
-transport is introduced. Historical messages without badge metadata stay unbadged.
+Badges are deliberately absent from both history and live chat. When this was
+decided the backend history contract did not store original badge identities,
+and the user chose consistent removal over live-only badge labels. Since
+2026-11-25 the backend returns raw `badges`, `badge_info` and `color` for newly
+stored messages; badge display remains removed until a separate change. The catalog service, privileged
+badge IPC, preload capability, renderer enrichment owner and badge CSS are removed;
+there is no hidden catalog request or textual fallback. Existing transport models
+still accept bounded, deduplicated supplied badge metadata for compatibility, but
+renderers never turn it into a role label or image. Author colors, message content,
+emotes and replies retain their existing owners. See [badge display](chat-badge-display.md).
 
 Chat appearance extends the existing TmcSettingsStore/settings.json owner with
 desktop-wide font size (14/16/18/20 px) and comfortable/compact message spacing.

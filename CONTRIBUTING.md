@@ -42,16 +42,18 @@ and verifies live results, account/channel reset, native PCG bounds and no sends
 A held-history response with an actual live IRC arrival proves history commit
 removes temporary/detached search results before replacing the feed.
 
-Badge coverage validates bounded IRC/structured metadata, deduplication, strict
-CDN URLs, channel overrides, request sharing/cache, stale account/token rejection,
-provider identity/HTTP failures and cooldown. Renderer tests register 5000 rows
-with a bounded pending index and verify reset/dispose reject late results.
-Synthetic Electron uses actual main HTTP/IRC/IPC and renderer code with loopback
-catalogs and substituted image delivery; it checks history/live images, missing
-metadata, unknown-label and broken-image fallback, account switching, unchanged
-native PCG and no sends. No real badge/provider/CDN transport is used by tests.
+Badges are not displayed in either history or live chat. When this was decided
+the backend history contract did not include original badge identities; the user
+chose consistent removal over live-only text fallbacks. Since 2026-11-25 the
+backend returns raw `badges`, `badge_info` and `color` for newly stored messages;
+badge display remains removed until a separate change. The bounded transport metadata parser
+remains covered, but the unused catalog service/bridge/rendering owner is removed.
+Synthetic Electron supplies history and IRC badge metadata and verifies no badge
+labels/images or catalog bridge, preserved message/author colors, account changes,
+unchanged native PCG and no sends. Badge API destinations are not admitted by
+the synthetic transport guard. See [badge display](docs/chat-badge-display.md).
 The full synthetic Electron process has a 180-second watchdog to cover the
-expanded auth/chat/appearance/badge scenario on Windows. Individual production
+expanded auth/chat/appearance scenario on Windows. Individual production
 request deadlines, assertion timeouts and ownership/network guards are unchanged.
 
 Appearance coverage exercises legacy defaults without read-side writes,

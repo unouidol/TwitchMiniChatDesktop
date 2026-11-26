@@ -5,8 +5,6 @@ import { createChatAuthor } from './createChatAuthor';
 import { TmcChatNameColorController } from './TmcChatNameColorController';
 import { isTwitchLogin } from '../../shared/chat/TmcUserColors';
 import { markChatAttention } from './markChatAttention';
-import { createChatBadges } from './createChatBadges';
-import { TmcChatBadgeController } from './TmcChatBadgeController';
 import { TmcChatSearchController } from './TmcChatSearchController';
 import {
   renderFavoriteChannels,
@@ -90,7 +88,6 @@ export class TmcChannelChatController {
   private readonly pcgSessionPanel: TmcPcgSessionPanelController | null;
   private readonly scrollController: TmcChatScrollController | null;
   private readonly nameColorController: TmcChatNameColorController;
-  private readonly badgeController: TmcChatBadgeController;
   private readonly searchController: TmcChatSearchController;
   private readonly renderedMessageKeys: string[] = [];
   private readonly renderedMessageKeySet = new Set<string>();
@@ -117,7 +114,6 @@ export class TmcChannelChatController {
     this.resetMentions();
     this.completionUsers.clear();
     this.nameColorController.reset();
-    this.badgeController.reset();
     this.searchController.reset();
     this.scrollController?.resetForContextChange();
     void this.reconnectCurrentChannelAfterAccountChange();
@@ -128,7 +124,6 @@ export class TmcChannelChatController {
     this.resetMentions();
     this.completionUsers.clear();
     this.nameColorController.reset();
-    this.badgeController.reset();
     this.searchController.reset();
     this.scrollController?.resetForContextChange();
     void this.reconnectCurrentChannelAfterAccountChange();
@@ -140,7 +135,6 @@ export class TmcChannelChatController {
   constructor(options: TmcChannelChatControllerOptions) {
     this.tmc = options.tmc;
     this.nameColorController = new TmcChatNameColorController(this.tmc, () => this.currentChannel);
-    this.badgeController = new TmcChatBadgeController(this.tmc, () => this.currentChannel, () => this.notifyViewportChanged());
     this.channelInput = options.channelInput;
     this.mentionButton?.addEventListener('click', this.handleNextMention);
     this.renderMentionCount();
@@ -261,7 +255,6 @@ export class TmcChannelChatController {
     this.mentionTargets.length = 0;
     this.completionUsers.clear();
     this.nameColorController.dispose();
-    this.badgeController.dispose();
     this.searchController.dispose();
     this.unsubscribeLiveMessage();
     this.unsubscribeStatusChanged();
@@ -284,7 +277,6 @@ export class TmcChannelChatController {
     this.resetMentions();
     this.completionUsers.clear();
     this.nameColorController.reset();
-    this.badgeController.reset();
     this.searchController.reset();
     dispatchChannelChanged(normalizedChannel);
     const channelLabel = document.querySelector<HTMLElement>('#chatChannelLabel');
@@ -344,7 +336,6 @@ export class TmcChannelChatController {
       for (const author of authors) this.rememberMention(author);
       for (const message of result.messages) this.rememberCompletionUser(message.user);
       this.nameColorController.schedule(authors);
-      this.badgeController.schedule(authors);
       authors.forEach((author, index) => {
         if (author.parentElement) this.searchController.add(author.parentElement, result.messages[index].user, result.messages[index].text);
       });
@@ -562,7 +553,6 @@ export class TmcChannelChatController {
     const author = appendLiveChatMessage(message, this.scrollController);
     this.rememberCompletionUser(message.username);
     if (author) this.nameColorController.schedule([author]);
-    if (author) this.badgeController.schedule([author]);
     if (author?.parentElement) this.searchController.add(author.parentElement, message.username, message.text);
     if (author) this.rememberMention(author);
   }
@@ -776,7 +766,7 @@ function appendLiveChatMessage(
 
   const textElement = createMessageContent(message.text, message.fragments);
 
-  messageElement.append(timeElement, createChatBadges(message.badges), authorElement, textElement);
+  messageElement.append(timeElement, authorElement, textElement);
   appendReplyControls(messageElement, message, message.displayName || message.username, message.reply);
   markChatAttention(messageElement, message.attention);
   chatList.appendChild(messageElement);

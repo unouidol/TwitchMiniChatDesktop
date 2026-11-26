@@ -16,7 +16,6 @@ export const TMC_IPC_CHANNELS = {
   EMOTE_CATALOG: 'tmc:emotes:catalog',
   CHAT_USER_COLORS: 'tmc:chat:user-colors',
   CHAT_OPEN_LINK: 'tmc:chat:open-link',
-  CHAT_BADGES: 'tmc:chat:badges',
   PLAYER_OPEN: 'tmc:player:open',
   PLAYER_STATUS: 'tmc:player:status',
   PLAYER_CHANGED: 'tmc:player:changed',
