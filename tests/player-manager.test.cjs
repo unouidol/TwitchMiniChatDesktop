@@ -4,6 +4,7 @@ const { EventEmitter } = require('node:events');
 let id = 0;
 let held = false;
 const views = [];
+const windows = [];
 const partitions = new Set();
 const makeStorage = () => ({ requestHandlers: 0, checkHandlers: 0,
   setPermissionRequestHandler(callback) { this.requestHandlers++; this.requestPermission = callback; },
@@ -33,8 +34,9 @@ class View {
 }
 class Window extends EventEmitter {
   webContents = new Contents(); destroyed = false; children = new Set();
-  contentView = { addChildView: (view) => this.children.add(view), removeChildView: (view) => this.children.delete(view) };
-  constructor(options = {}) { super(); this.width = options.width || 1200; this.height = options.height || 1000; }
+  contentView = Object.assign(new EventEmitter(), { addChildView: (view) => this.children.add(view), removeChildView: (view) => this.children.delete(view),
+    getBounds: () => ({ x: 0, y: 0, width: this.contentWidth ?? this.width, height: this.contentHeight ?? this.height }) });
+  constructor(options = {}) { super(); this.width = options.width || 1200; this.height = options.height || 1000; windows.push(this); }
   getContentSize() { return [this.width, this.height]; }
   isDestroyed() { return this.destroyed; }
   destroy() { this.destroyed = true; this.emit('closed'); }
@@ -72,6 +74,25 @@ test('moving retains its view; closing destroys media/source without clearing th
   assert.deepEqual([...partitions], ['persist:tmc-pcg-A']);
   assert.equal(view.preferences.session, webSessions.get('A'));
   assert.equal(storage.requestHandlers, 1); assert.equal(storage.checkHandlers, 1);
+});
+
+for (const action of ['embed', 'native-close']) test(`detached playback follows menu/content layout without an outer resize and cleans its observer on ${action}`, async (context) => {
+  const owner = new Window();
+  const manager = createPlayer(() => 'A', () => {}); context.after(() => manager.close());
+  await manager.show({ ...request(a), mode: 'detached' }, owner);
+  const detached = windows.at(-1), root = detached.contentView, view = views.at(-1);
+  const original = detached.getContentSize();
+  assert.equal(root.listenerCount('bounds-changed'), 1);
+  detached.contentHeight = detached.height - 26;
+  root.emit('bounds-changed');
+  assert.deepEqual(view.bounds, root.getBounds(), 'Menu layout must not leave the bottom of the video outside its parent');
+  assert.deepEqual(detached.getContentSize(), original, 'No outer-window resize was emitted');
+  if (action === 'embed') manager.setMode(a, 'embedded');
+  else { detached.destroy(); await manager.close(); }
+  assert.equal(root.listenerCount('bounds-changed'), 0);
+  const bounds = view.bounds;
+  root.emit('bounds-changed');
+  assert.deepEqual(view.bounds, bounds, 'Retired layout events cannot alter playback');
 });
 
 test('modal occlusion applied before creation stays effective through loading and can restore the same view', async (context) => {

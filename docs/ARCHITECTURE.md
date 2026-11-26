@@ -44,6 +44,13 @@ one playback WebContentsView and at most one separate video window. It embeds
 only with at least 400x300 video pixels and 180px remaining feed space. Otherwise
 it opens/moves to a separate window without stealing focus; returning inline is
 explicit. Moving reparents the same WebContents rather than reloading playback.
+The separate player window opens at 1010x698 logical pixels, matching the user's
+confirmed final window measured on Windows at 96 DPI (994x659 client area).
+The detached video follows the captured native content View's bounds, including
+`bounds-changed` events from delayed menu/layout updates that do not resize the
+outer window. It uses that View's actual dimensions, rather than an earlier
+window client-size sample. The layout listener is removed on native close and
+on return inline/destruction; no menu-height constant or hidden menu is used.
 Closing either control or the separate window destroys media and closes its
 source; account changes replace the playback context, while channel
 changes navigate the owned view. Refreshing history never restarts the same video.

@@ -3,6 +3,19 @@ import path from 'node:path';
 import { settledNativeViews } from './native-layout.mjs';
 
 export async function exercisePlayer(browser, fixture, evidence, readNativeViews, readPlayback, resizeOwnedWindow, closeOwnedPlayerWindow) {
+  const waitForDetachedFit = async () => {
+    let previous = ''; let samples = 0;
+    await browser.waitUntil(async () => {
+      const value = await readPlayback(); const view = value.playerViews[0];
+      if (!view || value.status.mode !== 'detached' || view.bounds.width < 400 || view.bounds.height < 300 ||
+          view.bounds.x !== 0 || view.bounds.y !== 0 || view.bounds.width !== view.parentBounds.width || view.bounds.height !== view.parentBounds.height) {
+        previous = ''; samples = 0; return false;
+      }
+      const key = JSON.stringify([view.id, view.windowId, view.parentBounds]);
+      samples = key === previous ? samples + 1 : 1; previous = key;
+      return samples >= 3;
+    }, { interval: 100, timeoutMsg: 'Detached video must stably fit its actual native content view after menu layout' });
+  };
   const sentBefore = fixture.sentMessages.length;
   const initialCalls = fixture.playerCalls.length;
   const draft = await browser.$('#messageInput').getValue();
@@ -70,6 +83,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     await browser.waitUntil(async () => (await readPlayback()).status.channel === 'fixture-channel' && (await readPlayback()).status.state === 'ready');
     await browser.$('[data-tmc-player-move]').click();
     await browser.waitUntil(async () => (await readPlayback()).status.mode === 'detached');
+    await waitForDetachedFit();
     assert.equal((await readPlayback()).playerViews[0].id, videoId, 'Detach retains the actual playback WebContents');
     await browser.$('[data-tmc-player-move]').waitForEnabled(); await browser.$('[data-tmc-player-move]').click();
     await browser.waitUntil(async () => (await readPlayback()).status.mode === 'embedded');
@@ -83,6 +97,7 @@ export async function exercisePlayer(browser, fixture, evidence, readNativeViews
     await trigger.click();
     await browser.waitUntil(async () => (await readPlayback()).status.state === 'ready');
     assert.equal((await readPlayback()).status.mode, 'detached', 'Small windows keep video in a separate window');
+    await waitForDetachedFit();
     const secondId = (await readPlayback()).playerViews[0].id;
     assert.notEqual(secondId, videoId);
     await browser.$('[data-tmc-account-select]').selectByAttribute('value', 'B');

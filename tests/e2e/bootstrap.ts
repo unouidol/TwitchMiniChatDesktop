@@ -209,7 +209,7 @@ void app.whenReady().then(async () => {
               sharedWithPcg: contents.session === expectedSession, webSessionPresent: cookies.some((cookie) => cookie.name === 'auth-token') });
           }).catch(() => { if (!contents.isDestroyed()) fail('Local player isolation observation failed'); }).finally(() => probingSecurity.delete(id));
         }
-        return [{ id, windowId: owner.id, bounds: view.getBounds(), security: playerSecurity.get(id) || null }];
+        return [{ id, windowId: owner.id, bounds: view.getBounds(), parentBounds: owner.contentView.getBounds(), security: playerSecurity.get(id) || null }];
       }));
     const playback = JSON.stringify({ status: services.player.getStatus(), sourceActive: !!source, destroyed: [...destroyedContents], playerViews, mainWindowId: window.id });
     if (playback !== previousPlayback) {
