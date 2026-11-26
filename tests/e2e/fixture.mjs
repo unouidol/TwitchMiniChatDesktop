@@ -11,9 +11,12 @@ export async function startFixture() {
   const emoteCalls = [];
   const catalogBlockedRequests = [];
   const colorCalls = [];
+  const playerCalls = [];
   let colorMessages = false;
   let mentionMessages = false;
   let badgeMessages = false;
+  let playerGate;
+  let releasePlayer;
   let historyGate;
   let releaseHistory;
   let pendingHistories = 0;
@@ -157,6 +160,18 @@ export async function startFixture() {
         ] : []));
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/player-frame') {
+        assert.ok(['fixture-channel', 'fixture-other'].includes(url.searchParams.get('channel')));
+        assert.equal(url.searchParams.get('parent'), 'localhost');
+        assert.equal(url.searchParams.get('muted'), 'true');
+        assert.equal(url.searchParams.get('autoplay'), 'true');
+        assert.equal(request.headers.authorization, undefined);
+        playerCalls.push({ channel: url.searchParams.get('channel') });
+        if (playerGate) await playerGate;
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<!doctype html><title>Local inert video fixture</title><style>body{background:#161328;color:white;font:24px sans-serif}</style><h1>Isolated video fixture</h1><p>No remote streaming service.</p>');
+        return;
+      }
       if (request.method === 'GET' && ['/pcg/fixture-channel', '/pcg/fixture-other'].includes(url.pathname)) {
         response.setHeader('Content-Type', 'text/html');
         response.end('<!doctype html><title>Local inert panel fixture</title><p>No remote PCG services.</p>');
@@ -203,7 +218,7 @@ export async function startFixture() {
   });
   return {
     origin: `http://127.0.0.1:${server.address().port}`,
-    requests, failures, chats, histories, sentMessages, emoteCalls, colorCalls, catalogBlockedRequests,
+    requests, failures, chats, histories, sentMessages, emoteCalls, colorCalls, playerCalls, catalogBlockedRequests,
     setColorMessages: (enabled) => { colorMessages = enabled; },
     setMentionMessages: (enabled) => { mentionMessages = enabled; },
     sendMentionMessages: (mode = 'mentions') => {
@@ -235,6 +250,8 @@ export async function startFixture() {
     setPhase: (value) => { phase = value; },
     setEmoteMessages: (enabled) => { emoteMessages = enabled; },
     setBadgeMessages: (enabled) => { badgeMessages = enabled; },
+    holdPlayer: () => { playerGate = new Promise((resolve) => { releasePlayer = resolve; }); },
+    releasePlayer: () => { releasePlayer?.(); playerGate = undefined; releasePlayer = undefined; },
     get pendingHistories() { return pendingHistories; },
     holdHistory: () => { historyGate = new Promise((resolve) => { releaseHistory = resolve; }); },
     releaseHistory: () => { releaseHistory?.(); historyGate = undefined; releaseHistory = undefined; },
@@ -276,6 +293,7 @@ export async function startFixture() {
       releaseColors?.();
       releaseCatalog?.();
       releaseHistory?.();
+      releasePlayer?.();
       const releases = await Promise.allSettled([
         (async () => {
           for (const connection of sockets.clients) connection.terminate();

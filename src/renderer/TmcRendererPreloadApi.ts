@@ -8,6 +8,7 @@ import type { TmcAppInfo } from '../shared/app/TmcAppInfo';
 import type { TmcEmoteCatalog, TmcEmoteCatalogRequest } from '../shared/chat/TmcEmoteCatalog';
 import type { TmcUserColorsRequest, TmcUserColorsResult } from '../shared/chat/TmcUserColors';
 import type { TmcBadgeRequest, TmcBadgeCatalog } from '../shared/chat/TmcChatBadges';
+import type { TmcPlayerContext, TmcPlayerLayoutRequest, TmcPlayerMode, TmcPlayerOpenRequest, TmcPlayerStatus } from '../shared/player/TmcPlayerModels';
 
 import type {
   TmcActiveAccountChannelStateResult,
@@ -149,6 +150,15 @@ export type TmcRendererPreloadApi = {
    * Settings operations available to the local UI.
    */
   readonly badges: { readonly getCatalog: (request: TmcBadgeRequest) => Promise<TmcBadgeCatalog> };
+  readonly player: {
+    readonly occlude: (request: { hidden: boolean }) => Promise<void>;
+    readonly open: (request: TmcPlayerOpenRequest) => Promise<TmcPlayerStatus>;
+    readonly getStatus: () => Promise<TmcPlayerStatus>;
+    readonly layout: (request: TmcPlayerLayoutRequest) => Promise<TmcPlayerStatus>;
+    readonly setMode: (request: TmcPlayerContext & { mode: TmcPlayerMode }) => Promise<TmcPlayerStatus>;
+    readonly close: (request: TmcPlayerContext) => Promise<TmcPlayerStatus>;
+    readonly onStatusChanged: (callback: (status: TmcPlayerStatus) => void) => () => void;
+  };
   readonly settings: {
     readonly setChatAppearance: (value: TmcChatAppearance) => Promise<TmcDesktopSettings>;
     readonly get: () => Promise<TmcDesktopSettings>;

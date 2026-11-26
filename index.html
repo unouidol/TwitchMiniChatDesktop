@@ -76,6 +76,7 @@
             <button type="button" class="tmc-button tmc-button-secondary tmc-favorite-toggle-button" data-tmc-toggle-favorite-channel>
               Favorite current
             </button>
+            <button type="button" class="tmc-button tmc-button-secondary tmc-live-toggle" data-tmc-player-toggle aria-controls="livePlayerPanel" aria-expanded="false" disabled>Show live</button>
 
             <div class="tmc-channel-section">
               <h3>Recent</h3>
@@ -129,6 +130,16 @@
           </div>
 
 
+          <section id="livePlayerPanel" class="tmc-live-player" data-tmc-player-panel hidden aria-label="Live player">
+            <header class="tmc-live-player-header"><strong data-tmc-player-title>Live</strong>
+              <button type="button" data-tmc-player-move>Open in window</button>
+              <button type="button" data-tmc-player-browser>Open on Twitch</button>
+              <button type="button" data-tmc-player-close aria-label="Close live player">Close</button>
+            </header>
+            <p data-tmc-player-status role="status"></p>
+            <label class="tmc-live-player-sizing" data-tmc-player-sizing>Video height <input type="range" min="300" max="600" value="300" step="10" data-tmc-player-height aria-label="Video height" /></label>
+            <div class="tmc-live-player-host" data-tmc-player-host></div>
+          </section>
           <section id="chatSearchPanel" class="tmc-chat-search" data-tmc-search-panel hidden aria-label="Search loaded chat">
             <label for="chatSearch">Find in chat</label>
             <div class="tmc-chat-search-controls">

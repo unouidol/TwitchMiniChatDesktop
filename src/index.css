@@ -392,6 +392,16 @@ button:focus-visible, summary:focus-visible, select:focus-visible {
 .tmc-chat-toolbar .tmc-live-status { margin-top: 4px; font-size: 12px; }
 .tmc-chat-toolbar #loadHistoryButton { min-height: 32px; font-size: 12px; flex-shrink: 0; }
 .tmc-favorite-toggle-button { width: 100%; font-size: 12px; font-weight: 500; }
+.tmc-live-toggle { width: 100%; margin-top: 8px; font-size: 12px; }
+.tmc-live-player { flex: 0 0 auto; background: #101827; border-bottom: 1px solid #334155; }
+.tmc-live-player[hidden], .tmc-live-player-host[hidden], .tmc-live-player-sizing[hidden] { display: none; }
+.tmc-live-player-header { display: flex; align-items: center; gap: 8px; padding: 7px 12px; }
+.tmc-live-player-header strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.tmc-live-player button { color: #e2e8f0; background: #334155; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; }
+.tmc-live-player p { margin: 0; padding: 0 12px 5px; font-size: 11px; color: #a8b4c7; }
+.tmc-live-player-sizing { display: flex; height: 32px; align-items: center; gap: 10px; padding: 0 12px; font-size: 11px; }
+.tmc-live-player-sizing input { flex: 1; min-width: 0; }
+.tmc-live-player-host { height: 300px; background: #080914; }
 
 .tmc-chat-toolbar strong {
   color: #f8fafc;

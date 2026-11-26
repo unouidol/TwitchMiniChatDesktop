@@ -8,6 +8,7 @@ import { initializeEmotePicker, notifyEmoteMessageSent } from '../chat/initializ
 import { initializeReplyComposer } from '../chat/initializeReplyComposer';
 import { initializeChatCompletion } from '../chat/initializeChatCompletion';
 import { initializeChatAppearance } from '../chat/initializeChatAppearance';
+import { initializeLivePlayer } from '../player/initializeLivePlayer';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
 //import { initializePcgSessionPanel } from '../pcg/initializePcgSessionPanel';
 
@@ -37,6 +38,8 @@ export async function bootstrapRenderer(): Promise<void> {
   });
   const appearance = initializeChatAppearance(tmc, () => chatController.notifyViewportChanged());
   window.addEventListener('pagehide', () => appearance.dispose(), { once: true });
+  const player = initializeLivePlayer(tmc, () => chatController.getCurrentChannel(), () => chatController.notifyViewportChanged());
+  window.addEventListener('pagehide', () => player.dispose(), { once: true });
 
   initializeAccountSwitcher(tmc);
   window.addEventListener('pagehide', () => chatController.dispose(), { once: true });

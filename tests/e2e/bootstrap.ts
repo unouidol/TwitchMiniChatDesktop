@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { installNetworkGuards } from './network-guards';
+import { registerPlayerShutdown } from '../../src/main/player/registerPlayerShutdown';
 
 function argument(name: string): string {
   const prefix = `--tmc-e2e-${name}=`;
@@ -74,12 +75,22 @@ const watchdog = setTimeout(() => fail('E2E Electron lifetime exceeded 180 secon
 watchdog.unref();
 app.once('will-quit', () => clearTimeout(watchdog));
 
+let playerService: import('../../src/main/player/TmcPlayerManager').TmcPlayerManager | null = null;
+const destroyedContents = new Set<number>();
+app.on('web-contents-created', (_event, contents) => {
+  const id = contents.id;
+  contents.once('destroyed', () => { destroyedContents.add(id); if (destroyedContents.size > 256) fail('Destroyed contents observation limit exceeded'); });
+});
 const guards = installNetworkGuards({
   backendOrigin: backend.origin,
   socketUrl,
   rendererRoot: path.resolve(__dirname, '../renderer/main_window'),
   evidencePath: path.join(root, `${phase}-network.json`),
   fail,
+  playerSource: () => {
+    const source = playerService?.source;
+    return source ? { ...source, channel: playerService.getStatus().channel } : null;
+  },
 });
 
 // Substitute only the Twitch HTTP boundary with the loopback fixture. The
@@ -140,7 +151,7 @@ void app.whenReady().then(async () => {
   }
   const { registerIpcHandlers } = await import('../../src/main/ipc/registerIpcHandlers');
   const { createMainWindow } = await import('../../src/main/windows/createMainWindow');
-  await registerIpcHandlers({
+  const services = await registerIpcHandlers({
     backendBaseUrl: backend.origin,
     desktopClientId: 'synthetic-e2e',
     desktopClientVersion: 'test',
@@ -154,14 +165,45 @@ void app.whenReady().then(async () => {
     pcgExtensionUrlTemplate: `${backend.origin}/pcg/{channel}`,
     chatWebSocketUrl: socketUrl,
   });
+  playerService = services.player;
+  registerPlayerShutdown(services.player, () => fail('Player shutdown cleanup failed'));
   const window = createMainWindow();
   // Read-only native-view observation. No renderer test API or IPC substitute.
   let previousBounds = '';
   let boundsRevision = 0;
   let sizeCommand = 0;
+  let playbackRevision = 0;
+  let previousPlayback = '';
+  const playerSecurity = new Map<number, { bridge: string; node: string; process: string; persistent: boolean; sandboxed: boolean }>();
+  const probingSecurity = new Set<number>();
   let cookieCommand = '';
   let cookieCommandPending = false;
   const boundsObservation = setInterval(() => {
+    const source = services.player.source;
+    const playerViews = BrowserWindow.getAllWindows().flatMap((owner) => owner.contentView.children
+      .filter((view): view is WebContentsView => view instanceof WebContentsView)
+      .flatMap((view) => {
+        const contents = view.webContents;
+        if (!contents || contents.isDestroyed() || !source || !contents.getURL().startsWith(`${source.origin}${source.pathname}?`)) return [];
+        const id = contents.id;
+        if (!playerSecurity.has(id) && !probingSecurity.has(id) && services.player.getStatus().state === 'ready') {
+          probingSecurity.add(id);
+          // Observe only the app-owned local wrapper, never remote Twitch/PCG DOM.
+          void contents.executeJavaScript('({ bridge: typeof window.tmc, node: typeof require, process: typeof process })').then((value: unknown) => {
+            assert.ok(value && typeof value === 'object' && 'bridge' in value && typeof value.bridge === 'string' &&
+              'node' in value && typeof value.node === 'string' && 'process' in value && typeof value.process === 'string');
+            const metric = app.getAppMetrics().find((entry) => entry.pid === contents.getOSProcessId());
+            playerSecurity.set(id, { bridge: value.bridge, node: value.node, process: value.process, persistent: contents.session.isPersistent(), sandboxed: metric?.sandboxed === true });
+          }).catch(() => { if (!contents.isDestroyed()) fail('Local player isolation observation failed'); }).finally(() => probingSecurity.delete(id));
+        }
+        return [{ id, windowId: owner.id, bounds: view.getBounds(), security: playerSecurity.get(id) || null }];
+      }));
+    const playback = JSON.stringify({ status: services.player.getStatus(), sourceActive: !!source, destroyed: [...destroyedContents], playerViews, mainWindowId: window.id });
+    if (playback !== previousPlayback) {
+      if (++playbackRevision > 512) fail('Playback observation limit exceeded');
+      fs.writeFileSync(path.join(root, `${phase}-playback-${playbackRevision}.json`), playback);
+      previousPlayback = playback;
+    }
     const sizePath = path.join(root, `${phase}-window-size-${sizeCommand + 1}.json`);
     if (fs.existsSync(sizePath)) {
       const requested: unknown = JSON.parse(fs.readFileSync(sizePath, 'utf8'));
@@ -174,6 +216,17 @@ void app.whenReady().then(async () => {
       fs.writeFileSync(path.join(root, `${phase}-window-size-${++sizeCommand}.ack.json`), JSON.stringify(previous));
     }
     if (window.isDestroyed()) return;
+    const closePlayerPath = path.join(root, `${phase}-close-player`);
+    const closePlayerAck = `${closePlayerPath}.ack`;
+    if (fs.existsSync(closePlayerPath) && !fs.existsSync(closePlayerAck)) {
+      assert.equal(fs.readFileSync(closePlayerPath, 'utf8'), 'close-owned-detached-player');
+      const status = services.player.getStatus();
+      assert.equal(status.mode, 'detached');
+      const children = BrowserWindow.getAllWindows().filter((child) => child !== window && child.getTitle() === `TMC live · #${status.channel}`);
+      assert.equal(children.length, 1);
+      children[0].close();
+      fs.writeFileSync(closePlayerAck, 'closed');
+    }
     // Parent-runner control of synthetic cookie storage, never production IPC.
     const commandPath = path.join(root, 'pcg-cookie-command');
     if (phase === 'first' && !cookieCommandPending && fs.existsSync(commandPath)) {
