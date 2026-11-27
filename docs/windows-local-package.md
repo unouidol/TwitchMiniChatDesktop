@@ -3,6 +3,13 @@
 Local Windows artifacts are unsigned candidates, not published releases.
 The [1.1.0 final build plan](releases/1.1.0.md) records final qualification;
 the [RC record](releases/1.1.0-rc.1.md) retains candidate history and limits.
+
+Since 1.1.1, release assets come from the **Release build** workflow
+(`.github/workflows/release.yml`, manual dispatch on `main` with the
+`package.json` version). It builds one exact commit on a clean Windows runner,
+runs the smoke tests below, and stages assets plus `SHA256SUMS.txt` in a draft
+release; publishing that draft creates the tag and is a separate authorized step.
+The local procedure below remains for diagnosis and local candidates.
 Use Node 24.22.3 and bundled npm 11.19.1 on Windows x64.
 
 ```powershell

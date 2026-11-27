@@ -1,0 +1,141 @@
+name: Release build
+
+# Builds the Windows release from one exact main commit on a clean hosted runner,
+# runs the protected-package and Squirrel lifecycle smoke tests, and stages the
+# assets in a DRAFT release. Publishing the draft (which creates the tag) is a
+# separate, explicitly authorized step; this workflow never publishes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'package.json version to release, without "v" (e.g. 1.1.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Windows release build
+    runs-on: windows-2025
+    timeout-minutes: 45
+    permissions:
+      contents: write # create the draft release and upload its assets only
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Require main and a plain version
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw "Release builds run only from main, not $env:GITHUB_REF" }
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw "Version must be MAJOR.MINOR.PATCH: $env:RELEASE_VERSION" }
+
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.22.3'
+          package-manager-cache: false
+
+      - name: Record runtime and source
+        run: |
+          $nodeVersion = node --version
+          if ($LASTEXITCODE -ne 0 -or $nodeVersion -ne 'v24.22.3') { throw 'Unexpected Node runtime' }
+          $npmVersion = npm --version
+          if ($LASTEXITCODE -ne 0 -or $npmVersion -ne '11.19.1') { throw 'Unexpected bundled npm' }
+          $manifest = Get-Content package.json -Raw | ConvertFrom-Json
+          if ($manifest.version -ne $env:RELEASE_VERSION) { throw "package.json is $($manifest.version), requested $env:RELEASE_VERSION" }
+          Write-Output "Node $nodeVersion; npm $npmVersion; version $($manifest.version); commit $env:GITHUB_SHA"
+
+      - name: Refuse an existing tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$env:RELEASE_VERSION"
+          git ls-remote --exit-code --tags "https://github.com/$env:GITHUB_REPOSITORY.git" "refs/tags/$tag" | Out-Null
+          if ($LASTEXITCODE -eq 0) { throw "Tag $tag already exists; tags are never moved" }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw "A release named $tag already exists (possibly a draft); delete it deliberately first" }
+          $global:LASTEXITCODE = 0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Require a clean tree before building
+        run: |
+          $dirty = git status --porcelain
+          if ($dirty) { throw "Working tree is not clean:`n$dirty" }
+
+      - name: Behavior tests, types and lint
+        run: |
+          npm test
+          if ($LASTEXITCODE -ne 0) { throw 'npm test failed' }
+          npm run typecheck
+          if ($LASTEXITCODE -ne 0) { throw 'typecheck failed' }
+          npm run lint
+          if ($LASTEXITCODE -ne 0) { throw 'lint failed' }
+
+      - name: Make Windows package
+        run: |
+          npm run make -- --platform=win32 --arch=x64
+          if ($LASTEXITCODE -ne 0) { throw 'make failed' }
+          $dirty = git status --porcelain
+          if ($dirty) { throw "Build changed tracked files:`n$dirty" }
+
+      - name: Provision checksum-verified ChromeDriver
+        run: node tests/e2e/provision-driver.mjs
+
+      - name: Smoke-test the protected package
+        run: |
+          npm run test:packaged
+          if ($LASTEXITCODE -ne 0) { throw 'packaged smoke failed' }
+
+      - name: Test Squirrel lifecycle events
+        run: |
+          npm run test:squirrel
+          if ($LASTEXITCODE -ne 0) { throw 'Squirrel lifecycle test failed' }
+
+      - name: Collect assets and checksums
+        run: |
+          $source = 'out/make/squirrel.windows/x64'
+          $names = @('TMC-desktop-Setup.exe', "twitchminichatdesktop-$env:RELEASE_VERSION-full.nupkg", 'RELEASES')
+          $assets = New-Item -ItemType Directory -Force release-assets
+          foreach ($name in $names) {
+            $file = Join-Path $source $name
+            if (-not (Test-Path -LiteralPath $file)) { throw "Missing release asset $name" }
+            Copy-Item -LiteralPath $file -Destination $assets
+          }
+          $lines = foreach ($name in $names) {
+            '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $assets $name)).Hash.ToLowerInvariant(), $name
+          }
+          [System.IO.File]::WriteAllText((Join-Path $assets 'SHA256SUMS.txt'), (($lines -join "`n") + "`n"))
+          Get-Content (Join-Path $assets 'SHA256SUMS.txt')
+
+      - name: Retain release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tmc-desktop-${{ inputs.version }}-windows-x64
+          retention-days: 30
+          if-no-files-found: error
+          path: release-assets/*
+
+      - name: Stage draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$env:RELEASE_VERSION"
+          $notes = "Draft staged by workflow run $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID from commit $env:GITHUB_SHA. Release notes are added before publication."
+          gh release create $tag --repo $env:GITHUB_REPOSITORY --draft --target $env:GITHUB_SHA --title "TMC desktop $env:RELEASE_VERSION" --notes $notes (Get-ChildItem release-assets).FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed' }
