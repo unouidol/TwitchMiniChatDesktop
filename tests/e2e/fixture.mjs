@@ -267,6 +267,15 @@ export async function startFixture() {
     sendBadgeMessage: () => {
       for (const connection of sockets.clients) if (connection.readyState === 1) connection.send('@id=badge-live;color=#34D399;badges=moderator/1,vip/1 :fixture_badge_user!fixture_badge_user@irc PRIVMSG #fixture-channel :Live badge metadata\r\n');
     },
+    sendFloodMessages: (prefix, count) => {
+      assert.match(prefix, /^flood-[a-z]+$/);
+      for (const connection of sockets.clients) {
+        if (connection.readyState !== 1) continue;
+        for (let index = 0; index < count; index += 1) {
+          connection.send(`@id=${prefix}-${index};color=#60A5FA :fixture_flood_user!fixture_flood_user@irc PRIVMSG #fixture-channel :${prefix} message ${index}\r\n`);
+        }
+      }
+    },
     sendSearchMessage: () => {
       for (const connection of sockets.clients) if (connection.readyState === 1) connection.send('@id=search-temporary;color=#34D399 :fixture_search_user!fixture_search_user@irc PRIVMSG #fixture-channel :Live during history refresh\r\n');
     },

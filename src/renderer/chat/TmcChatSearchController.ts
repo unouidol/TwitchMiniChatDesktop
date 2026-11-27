@@ -63,6 +63,20 @@ export class TmcChatSearchController {
     this.renderStatus();
   }
 
+  /** Drops entries for rows pruned from the chat, so they are neither kept alive nor revealed. */
+  forget(rows: ReadonlySet<Element>): void {
+    if (!rows.size || this.lifetime.signal.aborted) return;
+    const kept = this.entries.filter((entry) => !rows.has(entry.row));
+    if (kept.length === this.entries.length) return;
+    const selected = this.matches[this.position];
+    this.entries.splice(0, this.entries.length, ...kept);
+    this.characters = kept.reduce((total, entry) => total + entry.text.length, 0);
+    this.matches = this.matches.filter((entry) => !rows.has(entry.row));
+    this.position = selected && !rows.has(selected.row) ? this.matches.indexOf(selected) : -1;
+    this.limited = true;
+    this.renderStatus();
+  }
+
   reset(): void {
     this.close(false);
     this.entries.length = 0; this.characters = 0; this.limited = false;
