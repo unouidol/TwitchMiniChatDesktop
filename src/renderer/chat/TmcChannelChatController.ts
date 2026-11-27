@@ -45,6 +45,16 @@ const HISTORY_WINDOW_SECONDS = 3600;
 const MAX_CHAT_DEDUP_KEYS = 1000;
 
 /**
+ * Rendered rows kept for the open channel. Until 1.1.1 rows were only removed on
+ * a channel change: in Electron 43.8.12 synthetic rows of this shape grew the
+ * renderer by ~14 MB per 1000 (1474 MB at 100k) and stayed near 300 MB with this
+ * cap. Chatterino2 keeps 1000 messages per split (`scrollbackSplitLimit`, master
+ * c5caaab4afc9). Chromium scroll anchoring keeps the row being read in place when
+ * older rows go (measured: 0 px), so there is no manual scroll compensation.
+ */
+const MAX_RENDERED_CHAT_ROWS = 1000;
+
+/**
  * Time bucket used for fallback live-message deduplication.
  */
 const CHAT_DEDUP_BUCKET_MS = 10000;
@@ -372,6 +382,7 @@ export class TmcChannelChatController {
 
   private appendLocalMessage(author: string, text: string): void {
     appendLocalChatMessage(author, text, this.scrollController);
+    this.pruneChatRows();
   }
 
   private async holdPcgSessionForChannelChange(generation: number): Promise<void> {
@@ -573,6 +584,27 @@ export class TmcChannelChatController {
     if (author) this.badgeController.schedule([author]);
     if (author?.parentElement) this.searchController.add(author.parentElement, message.username, message.text);
     if (author) this.rememberMention(author);
+    this.pruneChatRows();
+  }
+
+  private pruneChatRows(): void {
+    const chatList = document.querySelector<HTMLElement>('#chatList');
+    if (!chatList || chatList.childElementCount <= MAX_RENDERED_CHAT_ROWS) return;
+    const removed = new Set<Element>();
+    while (chatList.childElementCount > MAX_RENDERED_CHAT_ROWS && chatList.firstElementChild) {
+      const row = chatList.firstElementChild;
+      removed.add(row);
+      row.remove();
+    }
+    this.searchController.forget(removed);
+    const selected = this.mentionTargets[this.mentionPosition];
+    const keptMentions = this.mentionTargets.filter((row) => !removed.has(row));
+    if (keptMentions.length !== this.mentionTargets.length) {
+      this.mentionTargets.splice(0, this.mentionTargets.length, ...keptMentions);
+      this.mentionPosition = selected && !removed.has(selected) ? keptMentions.indexOf(selected) : -1;
+      this.mentionsCapped = true;
+      this.renderMentionCount();
+    }
   }
 
   private rememberMention(author: HTMLElement): void {

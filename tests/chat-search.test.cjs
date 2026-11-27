@@ -78,3 +78,26 @@ test('search bounds recent row and text retention, removes evicted highlights an
   assert.equal(controls.get('[data-tmc-search-panel]').hidden, true);
   assert.equal(controls.get('#messageInput').focused, true);
 });
+
+test('pruned rows leave the index: no longer matched, revealed or counted, and the scope says older messages are excluded', (context) => {
+  const { controller, controls, document, search, revealed } = setup(context);
+  const old = row('old'); const kept = row('kept'); const other = row('other');
+  controller.add(old, 'alice', 'catch pikachu');
+  controller.add(kept, 'bob', 'catch eevee');
+  controller.add(other, 'carol', 'hello');
+  document.dispatchEvent(key('f', { ctrlKey: true }));
+  search('catch');
+  assert.match(controls.get('[data-tmc-search-status]').textContent, /2 matches/);
+  controls.get('#chatSearch').dispatchEvent(key('Enter'));
+  assert.deepEqual(revealed, ['old']);
+  controller.forget(new Set([old]));
+  assert.match(controls.get('[data-tmc-search-status]').textContent, /– \/ 1 matches/, 'The removed current match is not kept as current');
+  assert.match(controls.get('[data-tmc-search-scope]').textContent, /^2 recent loaded messages · older or oversized messages excluded$/);
+  controls.get('#chatSearch').dispatchEvent(key('Enter'));
+  controls.get('#chatSearch').dispatchEvent(key('Enter'));
+  assert.deepEqual(revealed, ['old', 'kept', 'kept'], 'Navigation never reaches a pruned row');
+  search('pikachu');
+  assert.equal(controls.get('[data-tmc-search-status]').textContent, 'No matches.');
+  controller.forget(new Set([row('unknown')]));
+  assert.match(controls.get('[data-tmc-search-scope]').textContent, /^2 recent/);
+});
