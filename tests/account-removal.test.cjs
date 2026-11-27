@@ -9,6 +9,7 @@ let handlers = new Map();
 let encryptionAvailable = true;
 let decryptionAvailable = true;
 let ircClient;
+let webSessions = new Map();
 const mainFrame = { url: 'http://localhost:5173/' };
 const sender = { mainFrame, isDestroyed: () => false, send: () => undefined };
 const event = { sender, senderFrame: mainFrame };
@@ -27,6 +28,22 @@ mock.module('electron', {
       handle: (channel, handler) => {
         assert.equal(handlers.has(channel), false, `Duplicate handler: ${channel}`);
         handlers.set(channel, handler);
+      },
+    },
+    session: {
+      fromPartition: (name) => {
+        if (!webSessions.has(name)) {
+          const cleared = [];
+          webSessions.set(name, {
+            cleared,
+            setPermissionRequestHandler() {}, setPermissionCheckHandler() {},
+            clearStorageData: async () => { cleared.push('storage'); },
+            clearCache: async () => { cleared.push('cache'); },
+            clearAuthCache: async () => { cleared.push('auth-cache'); },
+            cookies: { get: async () => [] },
+          });
+        }
+        return webSessions.get(name);
       },
     },
     BrowserWindow: {
@@ -48,6 +65,7 @@ const { registerIpcHandlers } = require('../.test-build/main/ipc/registerIpcHand
 const { TmcTwitchIrcClient } = require('../.test-build/main/chat/TmcTwitchIrcClient.js');
 const { TmcSecureAuthSessionStore } = require('../.test-build/main/auth/TmcSecureAuthSessionStore.js');
 const { TMC_IPC_CHANNELS: channels } = require('../.test-build/shared/ipc/IpcChannels.js');
+const { buildTwitchWebPartition } = require('../.test-build/main/web/TmcTwitchWebPartition.js');
 const config = {
   backendBaseUrl: 'https://backend.invalid',
   desktopClientId: 'test-client',
@@ -83,6 +101,7 @@ beforeEach(async (context) => {
   });
   userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'tmc-account-removal-'));
   handlers = new Map();
+  webSessions = new Map();
   requests = [];
   logoutWarnings = 0;
   expectedLogoutWarnings = 0;
@@ -332,3 +351,19 @@ for (const content of [
     assert.equal(requests.some(({ url }) => url === config.oauthDesktopLogoutUrl), false);
   });
 }
+
+test('removing an account signs it out of Twitch web storage and keeps the other account signed in', async () => {
+  await start();
+  await invoke(channels.ACCOUNT_REMOVE_LOCAL, { profileId: 'A' });
+  assert.deepEqual(webSessions.get(buildTwitchWebPartition('A'))?.cleared, ['storage', 'cache', 'auth-cache']);
+  assert.equal(webSessions.has(buildTwitchWebPartition('B')), false, 'B storage is never opened');
+});
+
+test('PCG sign-out rejects untrusted senders and an account PCG is not showing, before touching storage', async () => {
+  await start();
+  await assert.rejects(async () => invoke(channels.PCG_SIGN_OUT_TWITCH, { profileId: 'A' },
+    { sender, senderFrame: { url: 'https://www.twitch.tv/' } }), /Untrusted/);
+  await assert.rejects(async () => invoke(channels.PCG_SIGN_OUT_TWITCH, { profileId: 'A' }), /PCG account changed/);
+  await assert.rejects(async () => invoke(channels.PCG_SIGN_OUT_TWITCH, {}), /PCG account changed/);
+  assert.equal(webSessions.size, 0);
+});

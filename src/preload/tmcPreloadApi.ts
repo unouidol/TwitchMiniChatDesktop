@@ -274,6 +274,11 @@ export type TmcPcgPreloadApi = {
   readonly openDetachedWindow: () => Promise<TmcPcgStatus>;
 
   /**
+   * Signs one account out of the Twitch web session shared by PCG and video.
+   */
+  readonly signOutTwitch: (request: { readonly profileId: string }) => Promise<TmcPcgStatus>;
+
+  /**
    * Subscribes to passive PCG status changes.
    */
   readonly onStatusChanged: (
@@ -550,6 +555,11 @@ const IPC_PCG_OPEN_DETACHED_WINDOW = resolveIpcChannel(
   'tmc:pcg:open-detached-window',
 );
 
+const IPC_PCG_SIGN_OUT_TWITCH = resolveIpcChannel(
+  'PCG_SIGN_OUT_TWITCH',
+  'tmc:pcg:sign-out-twitch',
+);
+
 const IPC_PCG_GET_SESSION_STATUS = resolveIpcChannel(
   'PCG_GET_SESSION_STATUS',
   'tmc:pcg:get-session-status',
@@ -776,6 +786,10 @@ function createTmcPreloadApi(): TmcPreloadApi {
 
       openDetachedWindow: async (): Promise<TmcPcgStatus> => {
         return ipcRenderer.invoke(IPC_PCG_OPEN_DETACHED_WINDOW);
+      },
+
+      signOutTwitch: async (request: { readonly profileId: string }): Promise<TmcPcgStatus> => {
+        return ipcRenderer.invoke(IPC_PCG_SIGN_OUT_TWITCH, request);
       },
 
       onStatusChanged: (

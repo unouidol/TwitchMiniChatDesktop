@@ -25,7 +25,8 @@ or guest session is used by PCG/video for an unknown account.
 Video owns one media view, optional detached window and loopback document. Moving
 the video retains its view; account changes replace it with the new account's
 session. Close, errors, reload, stale requests and shutdown release those media
-resources without clearing shared storage, cache, HTTP auth or connections. PCG
+resources without clearing shared storage, cache, HTTP auth or connections; only
+the explicit PCG sign-out and account removal clear that account's web storage. PCG
 keeps ownership of its existing view and cookie-status subscription. Native
 persistent sessions remain owned by Electron for the application lifetime.
 

@@ -13,6 +13,7 @@ import type { TmcAuthSessionStore } from '../auth/TmcAuthSessionStore';
 import type { TmcSecureAuthSessionStore } from '../auth/TmcSecureAuthSessionStore';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import type { TmcChatIpcController } from './registerChatIpcHandlers';
+import type { TmcTwitchWebSignOut } from '../web/TmcTwitchWebSignOut';
 import {
   TmcAccountRemovalService,
   syncAuthSessionStore,
@@ -31,6 +32,7 @@ export function registerAccountIpcHandlers(
     readonly runtimeConfig: TmcRuntimeConfig;
     readonly secureAuthSessionStore: TmcSecureAuthSessionStore;
     readonly chatController: TmcChatIpcController;
+    readonly twitchWebSignOut: TmcTwitchWebSignOut;
   },
 ): void {
   const removalService = new TmcAccountRemovalService(
@@ -39,6 +41,7 @@ export function registerAccountIpcHandlers(
     options.secureAuthSessionStore,
     new TmcAuthBrokerClient(options.runtimeConfig, authSessionStore),
     options.chatController,
+    options.twitchWebSignOut,
   );
   ipcMain.handle(
     TMC_IPC_CHANNELS.ACCOUNT_LIST,

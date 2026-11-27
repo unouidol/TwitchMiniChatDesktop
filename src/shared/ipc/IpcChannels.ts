@@ -185,6 +185,11 @@ export const TMC_IPC_CHANNELS = {
   PCG_OPEN_DETACHED_WINDOW: 'tmc:pcg:open-detached-window',
 
   /**
+   * Signs the shown PCG account out of its Twitch web session (PCG and video).
+   */
+  PCG_SIGN_OUT_TWITCH: 'tmc:pcg:sign-out-twitch',
+
+  /**
    * Reads the current PCG session hold manager status.
    */
   PCG_GET_SESSION_STATUS: 'tmc:pcg:get-session-status',

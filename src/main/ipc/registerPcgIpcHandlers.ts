@@ -14,6 +14,8 @@ import type { TmcAccountSessionRegistry } from '../accounts/TmcAccountSessionReg
 import type { TmcAccountChannelStore } from '../channels/TmcAccountChannelStore';
 import type { TmcPcgSessionHoldManager } from '../pcg/TmcPcgSessionHoldManager';
 import type { TmcPcgSessionManager } from '../pcg/TmcPcgSessionManager';
+import type { TmcTwitchWebSignOut } from '../web/TmcTwitchWebSignOut';
+import { assertLocalRenderer } from './assertLocalRenderer';
 
 /**
  * Registers PCG Inter-Process Communication handlers.
@@ -23,6 +25,7 @@ export function registerPcgIpcHandlers(options: {
   readonly accountRegistry: TmcAccountSessionRegistry;
   readonly accountChannelStore: TmcAccountChannelStore;
   readonly pcgSessionHoldManager?: TmcPcgSessionHoldManager;
+  readonly twitchWebSignOut: TmcTwitchWebSignOut;
 }): void {
   let rendererSender: WebContents | null = null;
 
@@ -109,6 +112,27 @@ export function registerPcgIpcHandlers(options: {
       );
     },
   );
+  ipcMain.handle(
+    TMC_IPC_CHANNELS.PCG_SIGN_OUT_TWITCH,
+    async (event: IpcMainInvokeEvent, request: unknown): Promise<TmcPcgStatus> => {
+      assertLocalRenderer(event);
+      rendererSender = event.sender;
+      const profileId = readString(
+        request && typeof request === 'object' && 'profileId' in request ? request.profileId : null,
+      );
+      // The renderer names the account it showed; refuse if PCG or the active
+      // account moved on, so a stale click never signs out another account.
+      if (!profileId || profileId !== options.pcgSessionManager.getStatus().profileId ||
+        profileId !== options.accountRegistry.getActiveSession()?.profileId) {
+        throw new Error('PCG account changed. Reopen the menu and try again.');
+      }
+
+      await options.twitchWebSignOut.signOut(profileId);
+
+      return options.pcgSessionManager.getStatus();
+    },
+  );
+
   if (options.pcgSessionHoldManager) {
     registerLegacyHoldIpcHandlers(options.pcgSessionHoldManager);
   }

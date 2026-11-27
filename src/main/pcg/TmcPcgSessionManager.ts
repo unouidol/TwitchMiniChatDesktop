@@ -665,6 +665,23 @@ export class TmcPcgSessionManager {
       // Keep the popup open when the session state cannot be confirmed.
     }
   }
+  /**
+   * Marks the shown panel signed out after its Twitch web storage was cleared,
+   * and reloads it so the extension drops the previous identity.
+   */
+  completeTwitchWebSignOut(profileId: string): void {
+    if (this.status.profileId !== profileId.trim()) {
+      return;
+    }
+
+    this.setStatus({
+      ...this.status,
+      twitchAuth: 'signed-out',
+      message: 'Signed out of Twitch for PCG and video.',
+    });
+    this.reloadPanelAfterAuth();
+  }
+
   private reloadPanelAfterAuth(): void {
     if (!this.view || this.view.webContents.isDestroyed()) {
       return;

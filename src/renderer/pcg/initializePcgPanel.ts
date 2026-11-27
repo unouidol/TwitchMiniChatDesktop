@@ -7,8 +7,11 @@ import type { TmcPcgStatus } from '../../shared/pcg/TmcPcgModels';
 import { TMC_AUTH_DIALOG_CHANGED_EVENT } from '../auth/initializeAuthPanel';
 import { isLocalDialogVisible } from '../dialogs/TmcLocalDialog';
 import type { TmcRendererPreloadApi } from '../TmcRendererPreloadApi';
+import { appendLocalMessage } from '../chat/appendLocalMessage';
 
 const MIN_PCG_VIEW_SIZE = 20;
+const SIGN_OUT_CONFIRM_MESSAGE =
+  'Sign out of Twitch for PCG and video on this account? Chat stays signed in.';
 
 /**
  * Initializes the passive PokémonCommunityGame panel status UI.
@@ -28,6 +31,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
   const signInDescription = panel?.querySelector<HTMLElement>('[data-tmc-pcg-sign-in-description]');
   const detachButton =
     panel?.querySelector<HTMLButtonElement>('[data-tmc-pcg-detach]') || null;
+  const logoutButton = panel?.querySelector<HTMLButtonElement>('[data-tmc-pcg-logout]') || null;
   const detachedPlaceholder = ensureDetachedPlaceholder(host);
   const menu = panel?.querySelector<HTMLDetailsElement>('[data-tmc-pcg-menu]');
   const lifetime = new AbortController();
@@ -38,6 +42,8 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
   let lastKnownChannel = readChannelFromInput();
   let frameHandle: number | null = null;
   let loginPending = false;
+  let logoutPending = false;
+  let shownProfileId: string | null = null;
 
   if (loginButton) {
     loginButton.disabled = true;
@@ -47,7 +53,12 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     const accountSelect = document.querySelector<HTMLSelectElement>('[data-tmc-account-select]');
     if (status.profileId && accountSelect && status.profileId !== accountSelect.value) return;
     currentDisplayMode = status.displayMode;
+    shownProfileId = status.profileId;
     if (panel) panel.dataset.tmcPcgTwitchAuth = status.twitchAuth;
+    if (logoutButton) {
+      logoutButton.hidden = status.twitchAuth !== 'session-present';
+      logoutButton.disabled = logoutPending || !status.profileId;
+    }
     if (signInPrompt) {
       const wasHidden = signInPrompt.hidden;
       signInPrompt.hidden = status.state !== 'active' || status.twitchAuth === 'session-present';
@@ -200,6 +211,25 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     }
   };
   loginButton?.addEventListener('click', openLogin);
+
+  logoutButton?.addEventListener('click', async () => {
+    const profileId = shownProfileId;
+    closeMenu();
+    menu?.querySelector('summary')?.focus();
+    if (logoutPending || !profileId || !window.confirm(SIGN_OUT_CONFIRM_MESSAGE)) return;
+    logoutPending = true;
+    logoutButton.disabled = true;
+
+    try {
+      const status = await tmc.pcg.signOutTwitch({ profileId });
+      logoutPending = false;
+      renderStatus(status);
+    } catch (error) {
+      logoutPending = false;
+      logoutButton.disabled = false;
+      appendLocalMessage('error', getErrorMessage(error));
+    }
+  }, { signal: lifetime.signal });
   quickLoginButton?.addEventListener('click', openLogin, { signal: lifetime.signal });
 
   detachButton?.addEventListener('click', async () => {
