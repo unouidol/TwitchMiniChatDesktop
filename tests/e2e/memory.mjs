@@ -44,10 +44,16 @@ export async function exerciseMemory(browser, evidence, readMetrics, readPlaybac
   const accounts = await browser.execute('return Array.from(document.querySelector("[data-tmc-account-select]").options, (option) => option.value)');
   assert.ok(accounts.length >= 2, 'The scenario needs two accounts');
   const status = await browser.$('[data-tmc-pcg-status]');
-  for (let index = 0; index < 10; index += 1) {
-    const target = accounts[(accounts.indexOf(original) + index + 1) % accounts.length];
+  const switchTo = async (target) => {
     await select.selectByAttribute('value', target);
     await browser.waitUntil(async () => (await status.getText()).includes('active'), { timeout: 30000, timeoutMsg: `PCG reactivates for ${target}` });
+  };
+  // Warm up so every account has its kept panel, then switching must create none.
+  for (const target of [...accounts.filter((account) => account !== original), original]) await switchTo(target);
+  await browser.pause(2000);
+  const warm = await record('after warm-up (one panel per account)');
+  for (let index = 0; index < 10; index += 1) {
+    await switchTo(accounts[(accounts.indexOf(original) + index + 1) % accounts.length]);
   }
   if (await select.getValue() !== original) {
     await select.selectByAttribute('value', original);
@@ -86,15 +92,19 @@ export async function exerciseMemory(browser, evidence, readMetrics, readPlaybac
   }
   const played = await record('after 5 video open/close');
 
-  await fs.writeFile(path.join(evidence, 'memory-scenario.json'), JSON.stringify({ rows, baseline, switched, detached, played }, null, 2));
+  await fs.writeFile(path.join(evidence, 'memory-scenario.json'), JSON.stringify({ rows, baseline, warm, switched, detached, played }, null, 2));
   console.log(`[memory] ${JSON.stringify(rows)}`);
   console.table(rows);
 
-  // Pre-registered assertions (counts after GC only).
-  assert.equal(pcg(switched.afterGc).length, pcg(baseline.afterGc).length,
-    `Account switches must not leave PCG pages alive: ${JSON.stringify(pcg(switched.afterGc))}`);
-  assert.equal(detached.afterGc.length, baseline.afterGc.length,
+  // Pre-registered assertions (after GC only). Option A (2026-11-27): one kept
+  // panel per account, reused on every switch back.
+  const ids = (report) => pcg(report.afterGc).map((entry) => entry.id).sort((a, b) => a - b);
+  assert.ok(pcg(warm.afterGc).length <= accounts.length,
+    `At most one PCG page per account: ${JSON.stringify(pcg(warm.afterGc))}`);
+  assert.deepEqual(ids(switched), ids(warm),
+    `Account switches reuse the kept panels, creating and leaking none: ${JSON.stringify(pcg(switched.afterGc))}`);
+  assert.equal(detached.afterGc.length, switched.afterGc.length,
     `Closed separate PCG windows must not leave pages alive: ${JSON.stringify(detached.afterGc)}`);
-  assert.equal(played.afterGc.length, baseline.afterGc.length,
+  assert.equal(played.afterGc.length, detached.afterGc.length,
     `Closed video must not leave pages alive: ${JSON.stringify(played.afterGc)}`);
 }

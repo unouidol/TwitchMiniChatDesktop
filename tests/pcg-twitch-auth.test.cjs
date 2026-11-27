@@ -30,8 +30,11 @@ class FakeContents extends EventEmitter {
   constructor(partition) { super(); this.session = sessionFor(partition); this.destroyed = false; }
   isDestroyed() { return this.destroyed; }
   setWindowOpenHandler() {}
-  async loadURL(url) { this.url = url; }
+  async loadURL(url) { this.url = url; this.loads = (this.loads || 0) + 1; }
   getURL() { return this.url || ''; }
+  isLoading() { return false; }
+  isCrashed() { return false; }
+  close() { if (this.destroyed) return; this.destroyed = true; this.emit('destroyed'); }
 }
 class FakeView {
   constructor(options) {
@@ -254,4 +257,44 @@ test('a superseded shared PCG navigation cannot change the newer account or chan
   assert.equal(newer.profileId, 'B');
   assert.equal(newer.channel, 'other');
   assert.equal(calls, 2);
+});
+
+test('switching accounts keeps one loaded panel per account and returns to it without reloading', async () => {
+  const manager = makeManager();
+  await manager.activate('A', 'channel');
+  await manager.activate('B', 'channel');
+  await manager.activate('A', 'channel');
+  assert.equal(views.length, 2, 'Returning to A reuses its panel');
+  assert.equal(views[0].webContents.loads, 1, 'The kept panel is not reloaded');
+  assert.equal(manager.getStatus().state, 'active');
+  assert.equal(manager.getStatus().profileId, 'A');
+  for (let index = 0; index < 10; index += 1) await manager.activate(index % 2 ? 'A' : 'B', 'channel');
+  assert.equal(views.length, 2, 'Panels are bounded by the number of accounts');
+  assert.equal(views.filter((view) => view.webContents.isDestroyed()).length, 0);
+  await manager.activate('A', 'other-channel');
+  assert.equal(views[0].webContents.loads, 2, 'A different channel still loads');
+});
+
+test('a removed account closes its kept panel now, or the shown one at the next switch', async () => {
+  const manager = makeManager();
+  await manager.activate('A', 'channel');
+  await manager.activate('B', 'channel');
+  manager.releaseProfile('A');
+  assert.equal(views[0].webContents.isDestroyed(), true, 'A kept panel closes immediately');
+  manager.releaseProfile('B');
+  assert.equal(views[1].webContents.isDestroyed(), false, 'The shown panel stays until the next selection');
+  await manager.activate('A', 'channel');
+  assert.equal(views[1].webContents.isDestroyed(), true, 'The removed account panel closes at the switch');
+  assert.equal(views.length, 3, 'A gets a fresh panel');
+  await manager.activate('B', 'channel');
+  assert.equal(views.length, 4, 'A re-added B is not handed the closed panel');
+});
+
+test('signing out an account drops its kept signed-in panel', async () => {
+  const manager = makeManager();
+  await manager.activate('A', 'channel');
+  await manager.activate('B', 'channel');
+  manager.completeTwitchWebSignOut('A');
+  assert.equal(views[0].webContents.isDestroyed(), true);
+  assert.equal(views[1].webContents.isDestroyed(), false, 'The shown account is untouched');
 });

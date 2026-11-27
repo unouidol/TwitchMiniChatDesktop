@@ -48,6 +48,18 @@ export class TmcPcgSessionManager {
     message: null,
   };
   private view: WebContentsView | null = null;
+  /**
+   * Panels of the other accounts, kept loaded so switching back does not reload
+   * PCG (AGENTS.md: switching accounts keeps PCG panels loaded). Until 1.1.2 the
+   * previous view was only detached on a switch and stayed alive unreachable:
+   * the Windows E2E memory scenario counted one more live PCG page per switch,
+   * surviving a forced GC. Bounded by the number of accounts; a removed account's
+   * view is closed.
+   */
+  private readonly retainedViews = new Map<string, WebContentsView>();
+  private readonly closeOnSwitch = new Set<string>();
+  /** URL each view last loaded successfully; a failed or aborted load is never reused. */
+  private readonly loadedUrls = new WeakMap<WebContentsView, string>();
   private canDisplayView = false;
   private attachedWindow: BrowserWindow | null = null;
   private currentBounds: Rectangle | null = null;
@@ -363,8 +375,15 @@ export class TmcPcgSessionManager {
     try {
       const view = this.ensureView(key.profileId, ownerWindow || null);
       this.applyCurrentBounds();
-      console.info(`[PCG] loading panel ${sanitizeUrlForLog(url)}`);
-      await view.webContents.loadURL(url);
+      const contents = view.webContents;
+      if (this.loadedUrls.get(view) === url && contents.getURL() === url && !contents.isLoading() && !contents.isCrashed()) {
+        console.info(`[PCG] kept panel reused ${sanitizeUrlForLog(url)}`);
+      } else {
+        this.loadedUrls.delete(view);
+        console.info(`[PCG] loading panel ${sanitizeUrlForLog(url)}`);
+        await contents.loadURL(url);
+        this.loadedUrls.set(view, url);
+      }
       if (activation !== this.activationRevision || this.view !== view) return this.status;
 
       return this.setStatus({
@@ -422,12 +441,20 @@ export class TmcPcgSessionManager {
     this.detachCurrentView();
     this.stopTwitchAuthObservation?.();
     this.closeAuthPopup();
+    this.retainCurrentView();
     this.currentPartition = partition;
-    this.view = new WebContentsView({
-      webPreferences: buildPcgWebPreferences(partition),
-    });
+    const retained = this.retainedViews.get(partition);
+    this.retainedViews.delete(partition);
+    this.closeOnSwitch.delete(partition);
+    if (retained && !retained.webContents.isDestroyed()) {
+      this.view = retained;
+    } else {
+      this.view = new WebContentsView({
+        webPreferences: buildPcgWebPreferences(partition),
+      });
+      this.configurePcgWebContents(this.view, partition, ownerWindow);
+    }
     this.canDisplayView = true;
-    this.configurePcgWebContents(this.view, partition, ownerWindow);
     this.observeTwitchAuthentication(this.view, profileId, partition);
 
     if (ownerWindow) {
@@ -435,6 +462,32 @@ export class TmcPcgSessionManager {
     }
 
     return this.view;
+  }
+
+  /** Keeps the current account's view for a later switch back, or closes it if its account is gone. */
+  private retainCurrentView(): void {
+    const view = this.view;
+    const partition = this.currentPartition;
+    this.view = null;
+    if (!view || !partition || view.webContents.isDestroyed()) return;
+    if (this.closeOnSwitch.delete(partition)) {
+      view.webContents.close();
+      return;
+    }
+    this.retainedViews.set(partition, view);
+  }
+
+  /**
+   * Releases a removed account's panel. A retained view closes now; the shown
+   * one closes when the next account is selected, so the panel never goes blank
+   * under the user before the renderer moves on.
+   */
+  releaseProfile(profileId: string): void {
+    const partition = this.buildPartition(profileId);
+    const retained = this.retainedViews.get(partition);
+    this.retainedViews.delete(partition);
+    if (retained && !retained.webContents.isDestroyed()) retained.webContents.close();
+    if (this.currentPartition === partition && this.view) this.closeOnSwitch.add(partition);
   }
 
   private observeTwitchAuthentication(view: WebContentsView, profileId: string, partition: string): void {
@@ -675,6 +728,12 @@ export class TmcPcgSessionManager {
    * and reloads it so the extension drops the previous identity.
    */
   completeTwitchWebSignOut(profileId: string): void {
+    // A kept panel of this account still shows the signed-in page: drop it.
+    const partition = this.buildPartition(profileId);
+    const retained = this.retainedViews.get(partition);
+    this.retainedViews.delete(partition);
+    if (retained && !retained.webContents.isDestroyed()) retained.webContents.close();
+
     if (this.status.profileId !== profileId.trim()) {
       return;
     }

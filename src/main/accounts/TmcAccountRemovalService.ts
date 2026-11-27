@@ -36,6 +36,7 @@ export class TmcAccountRemovalService {
     }
 
     await this.accountRegistry.removeAccount(profileId);
+    this.twitchWebSignOut.releaseAccount(profileId);
     syncAuthSessionStore(this.authSessionStore, this.accountRegistry);
 
     if (savedSession) {

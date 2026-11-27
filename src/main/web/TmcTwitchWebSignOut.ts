@@ -11,6 +11,7 @@ type TmcTwitchWebPlayer = {
 
 type TmcTwitchWebPcg = {
   completeTwitchWebSignOut(profileId: string): void;
+  releaseProfile(profileId: string): void;
 };
 
 /**
@@ -25,6 +26,11 @@ export class TmcTwitchWebSignOut {
     private readonly pcg: TmcTwitchWebPcg,
     private readonly player: TmcTwitchWebPlayer,
   ) {}
+
+  /** Closes a removed account's kept PCG panel; runs whether or not sign-out succeeded. */
+  releaseAccount(profileId: string): void {
+    this.pcg.releaseProfile(profileId.trim());
+  }
 
   async signOut(profileId: string): Promise<void> {
     const owner = profileId.trim();
