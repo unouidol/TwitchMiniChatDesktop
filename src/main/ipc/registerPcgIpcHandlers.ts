@@ -39,6 +39,7 @@ export function registerPcgIpcHandlers(options: {
       event: IpcMainInvokeEvent,
       request: TmcPcgActivateRequest = {},
     ): Promise<TmcPcgStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
       const activation = await resolveActivationRequest(
         request,
@@ -61,6 +62,7 @@ export function registerPcgIpcHandlers(options: {
   ipcMain.handle(
     TMC_IPC_CHANNELS.PCG_GET_STATUS,
     async (event: IpcMainInvokeEvent): Promise<TmcPcgStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
 
       return options.pcgSessionManager.getStatus();
@@ -73,6 +75,7 @@ export function registerPcgIpcHandlers(options: {
       event: IpcMainInvokeEvent,
       request: TmcPcgBoundsRequest,
     ): Promise<TmcPcgStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
 
       return options.pcgSessionManager.setBounds(
@@ -85,6 +88,7 @@ export function registerPcgIpcHandlers(options: {
   ipcMain.handle(
     TMC_IPC_CHANNELS.PCG_HIDE_VIEW,
     async (event: IpcMainInvokeEvent): Promise<TmcPcgStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
 
       return options.pcgSessionManager.hideView();
@@ -94,6 +98,7 @@ export function registerPcgIpcHandlers(options: {
   ipcMain.handle(
     TMC_IPC_CHANNELS.PCG_OPEN_TWITCH_LOGIN,
     async (event: IpcMainInvokeEvent): Promise<TmcPcgStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
 
       return options.pcgSessionManager.openTwitchLogin(
@@ -105,6 +110,7 @@ export function registerPcgIpcHandlers(options: {
   ipcMain.handle(
     TMC_IPC_CHANNELS.PCG_OPEN_DETACHED_WINDOW,
     async (event: IpcMainInvokeEvent): Promise<TmcPcgStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
 
       return options.pcgSessionManager.openDetachedWindow(
@@ -143,7 +149,8 @@ function registerLegacyHoldIpcHandlers(
 ): void {
   ipcMain.handle(
     TMC_IPC_CHANNELS.PCG_GET_SESSION_STATUS,
-    async (): Promise<TmcPcgSessionStatus> => {
+    async (event: IpcMainInvokeEvent): Promise<TmcPcgSessionStatus> => {
+      assertLocalRenderer(event);
       return pcgSessionHoldManager.getStatus();
     },
   );
@@ -151,9 +158,10 @@ function registerLegacyHoldIpcHandlers(
   ipcMain.handle(
     TMC_IPC_CHANNELS.PCG_ACTIVATE_SESSION,
     async (
-      _event,
+      event,
       request: TmcPcgActivateSessionRequest,
     ): Promise<TmcPcgSessionStatus> => {
+      assertLocalRenderer(event);
       return pcgSessionHoldManager.activateSession(
         request.profileId,
         request.channel,
@@ -163,7 +171,8 @@ function registerLegacyHoldIpcHandlers(
 
   ipcMain.handle(
     TMC_IPC_CHANNELS.PCG_HOLD_ACTIVE_SESSION,
-    async (): Promise<TmcPcgSessionStatus> => {
+    async (event: IpcMainInvokeEvent): Promise<TmcPcgSessionStatus> => {
+      assertLocalRenderer(event);
       return pcgSessionHoldManager.holdActiveSession();
     },
   );

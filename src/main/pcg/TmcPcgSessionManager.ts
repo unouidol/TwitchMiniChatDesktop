@@ -1,7 +1,6 @@
 import {
   BrowserWindow,
   WebContentsView,
-  shell,
   type BrowserWindowConstructorOptions,
   type Rectangle,
   type WebContents,
@@ -15,6 +14,10 @@ import type {
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import { buildTwitchWebPartition } from '../web/TmcTwitchWebPartition';
 import type { TmcTwitchWebSessions } from '../web/TmcTwitchWebSessions';
+import { createExternalLinkGate } from '../web/TmcExternalLinkGate';
+
+// One gate for every PCG surface, so prompts never stack across windows.
+const externalLinkGate = createExternalLinkGate();
 
 const HIDDEN_BOUNDS: Rectangle = { x: 0, y: 0, width: 0, height: 0 };
 const TWITCH_LOGIN_URL = 'https://www.twitch.tv/login';
@@ -527,6 +530,8 @@ export class TmcPcgSessionManager {
       console.info(`[PCG] navigation allowed ${sanitizeUrlForLog(url)}`);
     });
 
+    blockForeignMainFrameRedirects(view.webContents, 'panel');
+
     view.webContents.on('did-fail-load', (_event, errorCode, errorDescription, url) => {
       if (errorCode === -3) {
         return;
@@ -921,6 +926,8 @@ function configurePcgWebContentsForChildWindow(
     console.info(`[PCG] ${logLabel} navigation allowed ${sanitizeUrlForLog(url)}`);
   });
 
+  blockForeignMainFrameRedirects(webContents, logLabel);
+
   webContents.on('did-fail-load', (_event, errorCode, errorDescription, url) => {
     if (errorCode === -3) {
       return;
@@ -1008,12 +1015,29 @@ function isTwitchAuthorizationHost(url: URL): boolean {
 }
 
 function openExternalIfSafe(url: URL | null): void {
-  if (!url || url.protocol !== 'https:') {
-    return;
-  }
+  externalLinkGate.request(url);
+}
 
-  void shell.openExternal(url.toString()).catch((error: unknown) => {
-    console.warn(`[PCG] external open failed message=${sanitizeLogText(getErrorMessage(error))}`);
+/**
+ * `will-navigate` does not fire for server-side redirects, so without this a
+ * Twitch/PCG main frame could be redirected to any site and shown inside TMC.
+ * Subframes are left alone: Twitch pages embed third-party frames legitimately.
+ */
+function blockForeignMainFrameRedirects(webContents: WebContents, logLabel: string): void {
+  webContents.on('will-redirect', (details) => {
+    if (!details.isMainFrame) {
+      return;
+    }
+
+    const parsedUrl = tryParseUrl(details.url);
+
+    if (parsedUrl && isAllowedTwitchOrPcgUrl(parsedUrl)) {
+      return;
+    }
+
+    details.preventDefault();
+    console.warn(`[PCG] ${logLabel} redirect blocked ${sanitizeUrlForLog(details.url)}`);
+    openExternalIfSafe(parsedUrl);
   });
 }
 

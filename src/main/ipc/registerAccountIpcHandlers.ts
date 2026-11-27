@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { assertLocalRenderer } from './assertLocalRenderer';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
@@ -45,14 +46,16 @@ export function registerAccountIpcHandlers(
   );
   ipcMain.handle(
     TMC_IPC_CHANNELS.ACCOUNT_LIST,
-    async (): Promise<TmcAccountListResult> => {
+    async (event: IpcMainInvokeEvent): Promise<TmcAccountListResult> => {
+      assertLocalRenderer(event);
       return accountRegistry.listAccounts();
     },
   );
 
   ipcMain.handle(
     TMC_IPC_CHANNELS.ACCOUNT_GET_ACTIVE,
-    async (): Promise<TmcActiveAccountResult> => {
+    async (event: IpcMainInvokeEvent): Promise<TmcActiveAccountResult> => {
+      assertLocalRenderer(event);
       return accountRegistry.getActiveAccountResult();
     },
   );
@@ -60,9 +63,10 @@ export function registerAccountIpcHandlers(
   ipcMain.handle(
     TMC_IPC_CHANNELS.ACCOUNT_SET_ACTIVE,
     async (
-      _event,
+      event: IpcMainInvokeEvent,
       request: TmcSetActiveAccountRequest,
     ): Promise<TmcActiveAccountResult> => {
+      assertLocalRenderer(event);
       const result = await accountRegistry.setActiveAccount(request.profileId);
       syncAuthSessionStore(authSessionStore, accountRegistry);
 

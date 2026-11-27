@@ -19,6 +19,10 @@ let restore;
 
 global.MAIN_WINDOW_VITE_DEV_SERVER_URL = 'http://localhost:5173/';
 global.MAIN_WINDOW_VITE_NAME = 'main_window';
+// Handlers accept only the local main frame; tests call them as the main window.
+const mainFrame = { url: global.MAIN_WINDOW_VITE_DEV_SERVER_URL };
+const sender = { mainFrame, isDestroyed: () => false, send: () => undefined };
+const event = { sender, senderFrame: mainFrame };
 global.WebSocket = class {
   constructor() { throw new Error('Unexpected real WebSocket in restore tests'); }
 };
@@ -30,7 +34,10 @@ mock.module('electron', {
       assert.equal(handlers.has(channel), false, `Duplicate handler: ${channel}`);
       handlers.set(channel, handler);
     } },
-    BrowserWindow: { getAllWindows: () => [] },
+    BrowserWindow: {
+      getAllWindows: () => [],
+      fromWebContents: (contents) => contents === sender ? { webContents: sender } : null,
+    },
     safeStorage: {
       isEncryptionAvailable: () => encryptionAvailable,
       encryptString: (value) => Buffer.from(value),
@@ -116,11 +123,11 @@ async function seed(profileIds = ['A']) {
 async function initialize(runtimeConfig = config) {
   handlers = new Map();
   await registerIpcHandlers(runtimeConfig);
-  return handlers.get(channels.ACCOUNT_LIST)();
+  return handlers.get(channels.ACCOUNT_LIST)(event);
 }
 async function assertSignedOut() {
-  assert.deepEqual((await handlers.get(channels.ACCOUNT_LIST)()).accounts, []);
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).isLoggedIn, false);
+  assert.deepEqual((await handlers.get(channels.ACCOUNT_LIST)(event)).accounts, []);
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).isLoggedIn, false);
 }
 
 const failures = [
@@ -146,7 +153,7 @@ for (const entry of failures) {
     assert.deepEqual(await fs.readFile(store.getFilePath()), before);
     restore = async (profileId) => response(profileId);
     assert.deepEqual((await initialize()).accounts.map((account) => account.profileId), ['A']);
-    assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'A');
+    assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, 'A');
     assert.deepEqual(requests, ['A', 'A']);
   });
 }
@@ -160,7 +167,7 @@ test('one failed account does not prevent another from restoring or erase either
   expectedWarnings.push(restoreWarning('unavailable'));
   const result = await initialize();
   assert.deepEqual(result.accounts.map((account) => account.profileId), ['B']);
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'B');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, 'B');
   assert.deepEqual((await store.loadSessions()).map((saved) => saved.profileId).sort(), ['A', 'B']);
   for (const saved of await store.loadSessions()) {
     assert.equal(saved.desktopSessionToken, session(saved.profileId).desktopSessionToken);
@@ -187,7 +194,7 @@ for (const preferred of ['A', 'B']) {
       const result = await initialize();
       assert.deepEqual(requests, order, 'Exercise both actual restore orders');
       assert.equal(result.activeProfileId, preferred);
-      assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, preferred);
+      assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, preferred);
       assert.equal(await preference.loadActiveProfileId(), preferred);
       assert.deepEqual(writes, [preferred], 'No intermediate fallback may overwrite the preference');
       assert.deepEqual(result.accounts.map((account) => account.profileId).sort(), ['A', 'B']);
@@ -211,7 +218,7 @@ for (const preferred of [null, 'removed-account']) {
     });
     const result = await initialize();
     assert.ok(['A', 'B'].includes(result.activeProfileId));
-    assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, result.activeProfileId);
+    assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, result.activeProfileId);
     assert.equal(await preference.loadActiveProfileId(), result.activeProfileId);
     assert.deepEqual(writes, [result.activeProfileId]);
   });
@@ -228,7 +235,7 @@ test('an unavailable preferred account falls back to another restored account wi
   expectedWarnings.push(restoreWarning('unavailable'));
   const result = await initialize();
   assert.equal(result.activeProfileId, 'B');
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'B');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, 'B');
   assert.equal(await preference.loadActiveProfileId(), 'B');
   assert.deepEqual((await store.loadSessions()).map((saved) => saved.profileId).sort(), ['A', 'B']);
 });
@@ -245,7 +252,7 @@ test('a fully failed startup retains the preference for a later successful resta
   assert.deepEqual((await store.loadSessions()).map((saved) => saved.profileId).sort(), ['A', 'B']);
   restore = async (id) => response(id);
   assert.equal((await initialize()).activeProfileId, 'A');
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'A');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, 'A');
 });
 
 test('restore timeout is passed to the actual request and retains saved authentication', async (context) => {
@@ -312,7 +319,7 @@ test('successful restore accepts a renamed user and persists a rotated desktop t
   assert.equal(compatibility.getSession(), null);
   assert.equal((await initialize()).activeProfileId, 'A');
   assert.equal((await store.loadSessions())[0].desktopSessionToken, 'synthetic-rotated-A');
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).username, 'renamed-user');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).username, 'renamed-user');
 });
 
 test('network failure preserves its cause without exposing it in startup diagnostics', async () => {
@@ -366,7 +373,7 @@ for (const content of [
     await initialize();
     await assertSignedOut();
     await assert.rejects(store.saveSession(session('B')));
-    await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)({}, 'synthetic-claim-B'), (error) => {
+    await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)(event, 'synthetic-claim-B'), (error) => {
       assert.equal(error.message, 'Saved authentication could not be updated. Existing saved data was retained.');
       assert.ok(error.cause instanceof Error, 'Retain a safe diagnostic category');
       assert.doesNotMatch(error.message, /sensitive-|synthetic-/);
@@ -402,23 +409,23 @@ test('a new login whose persistence fails cannot replace an already active accou
     if (to === store.getFilePath()) return Promise.reject(Object.assign(new Error('Controlled login save failure'), { code: 'EIO' }));
     return original(from, to);
   });
-  await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)({}, 'synthetic-claim-B'));
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'A');
-  assert.deepEqual((await handlers.get(channels.ACCOUNT_LIST)()).accounts.map((account) => account.profileId), ['A']);
+  await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)(event, 'synthetic-claim-B'));
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, 'A');
+  assert.deepEqual((await handlers.get(channels.ACCOUNT_LIST)(event)).accounts.map((account) => account.profileId), ['A']);
   assert.deepEqual(await fs.readFile(store.getFilePath()), before);
 });
 
 test('a successful new login persists before activation and returns only the renderer-safe contract', async () => {
   const store = await seed();
   await initialize();
-  const result = await handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)({}, 'synthetic-claim-B');
+  const result = await handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)(event, 'synthetic-claim-B');
   assert.deepEqual(result, {
     success: true, profileId: 'B', username: 'fixture-B', userId: 'fixture-user-B', message: 'Logged in as fixture-B.',
   });
   assert.doesNotMatch(JSON.stringify(result), /synthetic-|accessToken|desktopSessionToken/);
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'B');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, 'B');
   assert.deepEqual((await store.loadSessions()).map((saved) => saved.profileId).sort(), ['A', 'B']);
-  assert.equal((await handlers.get(channels.ACCOUNT_LIST)()).activeProfileId, 'B');
+  assert.equal((await handlers.get(channels.ACCOUNT_LIST)(event)).activeProfileId, 'B');
 });
 
 test('a stalled login request is bounded and leaves the selected saved account unchanged', async (context) => {
@@ -434,9 +441,9 @@ test('a stalled login request is bounded and leaves the selected saved account u
     options.signal.throwIfAborted();
     assert.fail('An aborted request must not finalize login');
   });
-  await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)({}, 'synthetic-claim-B'));
-  assert.equal((await handlers.get(channels.ACCOUNT_LIST)()).activeProfileId, 'A');
-  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)()).profileId, 'A');
+  await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)(event, 'synthetic-claim-B'));
+  assert.equal((await handlers.get(channels.ACCOUNT_LIST)(event)).activeProfileId, 'A');
+  assert.equal((await handlers.get(channels.AUTH_GET_STATUS)(event)).profileId, 'A');
   assert.deepEqual(await fs.readFile(store.getFilePath()), before);
 });
 
@@ -466,9 +473,9 @@ test('login timeout interrupts a real loopback body before persistence or select
       controller.abort(new DOMException('Controlled login body timeout', 'TimeoutError'));
       return result;
     });
-    await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)({}, 'synthetic-claim-B'));
+    await assert.rejects(handlers.get(channels.AUTH_FINALIZE_TWITCH_LOGIN)(event, 'synthetic-claim-B'));
     assert.equal(observedHeaders, true);
-    assert.equal((await handlers.get(channels.ACCOUNT_LIST)()).activeProfileId, 'A');
+    assert.equal((await handlers.get(channels.ACCOUNT_LIST)(event)).activeProfileId, 'A');
     assert.deepEqual(await fs.readFile(store.getFilePath()), before);
   } finally {
     server.closeAllConnections();
