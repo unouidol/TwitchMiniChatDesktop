@@ -76,8 +76,10 @@ jobs:
           [ "$(jq -s length draft.json)" = 1 ] || { echo "::error::Expected exactly one draft for $tag"; exit 1; }
           target=$(jq -r .target_commitish draft.json)
           [[ "$target" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Draft target is not a commit SHA: $target"; exit 1; }
-          git fetch --quiet origin main
-          git merge-base --is-ancestor "$target" origin/main || { echo "::error::$target is not on main"; exit 1; }
+          # The checkout is shallow, so ask GitHub: a commit on main is never
+          # ahead of main (run 45982230103 refused b7520d9 with merge-base).
+          behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/$target...main" --jq .behind_by)
+          [ "$behind" = 0 ] || { echo "::error::$target is not on main (behind_by=$behind)"; exit 1; }
           sums_id=$(jq -r '.assets[] | select(.name == "SHA256SUMS.txt") | .id' draft.json)
           [ -n "$sums_id" ] || { echo "::error::Draft has no SHA256SUMS.txt"; exit 1; }
           gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/$sums_id" > SHA256SUMS.txt
