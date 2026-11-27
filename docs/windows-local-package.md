@@ -9,6 +9,16 @@ Since 1.1.1, release assets come from the **Release build** workflow
 `package.json` version). It builds one exact commit on a clean Windows runner,
 runs the smoke tests below, and stages assets plus `SHA256SUMS.txt` in a draft
 release; publishing that draft creates the tag and is a separate authorized step.
+**Publish release** (`.github/workflows/publish-release.yml`, manual dispatch on
+`main`) publishes that draft with the reviewed notes in
+`docs/releases/<version>-notes.md`. It runs in the `release` environment, which
+must require a maintainer review: a first job fails closed if that environment is
+missing or unprotected, because GitHub would otherwise create it unprotected. It
+checks that the draft targets a `main` commit, that the tag does not exist and
+that the uploaded assets match `SHA256SUMS.txt`, then verifies that the tag and
+"latest" point to the built commit. The agent session cannot publish releases or
+create environments itself; the maintainer creates the environment once and
+approves each publication.
 The local procedure below remains for diagnosis and local candidates.
 Use Node 24.22.3 and bundled npm 11.19.1 on Windows x64.
 
