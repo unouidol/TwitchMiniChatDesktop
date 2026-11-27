@@ -23,7 +23,7 @@
     "name": "unouidol",
     "email": "federico.silenzi@alice.it"
   },
-  "license": "MIT",
+  "license": "UNLICENSED",
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",
     "@electron-forge/maker-deb": "^8.0.1",
