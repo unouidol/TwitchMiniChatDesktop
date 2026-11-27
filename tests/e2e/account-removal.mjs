@@ -18,6 +18,7 @@ import { exerciseAppearance, verifyAppearanceRestart } from './appearance.mjs';
 import { exerciseTimestamps } from './timestamps.mjs';
 import { exerciseBadges } from './badges.mjs';
 import { exerciseSearch } from './search.mjs';
+import { exerciseChatRowCap } from './chat-cap.mjs';
 import { exercisePlayer } from './player.mjs';
 import { appVersionPlugin } from '../../build/appVersion.mjs';
 import { observeDriverTraffic, provenance, verifyDriver } from './driver.mjs';
@@ -278,6 +279,7 @@ try {
   await exerciseMentions(browser, fixture, evidence, readNativeViews);
   await exerciseBadges(browser, fixture, evidence, readNativeViews);
   await exerciseSearch(browser, fixture, evidence, readNativeViews);
+  await exerciseChatRowCap(browser, fixture);
   await setBrowserSession('present-A');
   await exercisePlayer(browser, fixture, evidence, readNativeViews, readPlayback, resizeOwnedWindow, closeOwnedPlayerWindow);
   const projectLinks = (await fs.readFile(path.join(root, 'project-link-attempts.txt'), 'utf8')).trim().split('\n');
