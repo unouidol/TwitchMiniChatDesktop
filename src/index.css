@@ -29,7 +29,9 @@ button {
 }
 
 button:disabled {
-  cursor: wait;
+  /* Disabled means unavailable, not busy: an empty account list or a missing
+     selection must not look like an endless load. */
+  cursor: not-allowed;
   opacity: 0.65;
 }
 
