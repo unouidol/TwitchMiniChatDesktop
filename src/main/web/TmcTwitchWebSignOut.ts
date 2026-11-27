@@ -29,6 +29,13 @@ export class TmcTwitchWebSignOut {
   async signOut(profileId: string): Promise<void> {
     const owner = profileId.trim();
     const browserSession = this.webSessions.get(owner);
+    const t0 = Date.now();
+    const count = async (): Promise<number> => (await browserSession.cookies.get(TWITCH_AUTH_COOKIE)).length;
+    const diag = (_e: unknown, cookie: Electron.Cookie, cause: string, removed: boolean): void => {
+      if (cookie.name === 'auth-token') console.info(`[DIAG-SIGNOUT] at=${Date.now()} +${Date.now() - t0}ms changed removed=${removed} cause=${cause} domain=${cookie.domain} path=${cookie.path} hostOnly=${cookie.hostOnly} session=${cookie.session}`);
+    };
+    browserSession.cookies.on('changed', diag);
+    console.info(`[DIAG-SIGNOUT] at=${Date.now()} +0ms start authCookies=${await count()} windows=${BrowserWindow.getAllWindows().length}`);
     const player = this.player.getStatus();
 
     if (player.profileId === owner && player.state !== 'closed') {
@@ -39,8 +46,13 @@ export class TmcTwitchWebSignOut {
     // left open they would keep showing a signed-in page.
     await destroyWindowsUsing(browserSession);
     await browserSession.clearStorageData();
+    console.info(`[DIAG-SIGNOUT] at=${Date.now()} +${Date.now() - t0}ms after clearStorageData authCookies=${await count()}`);
     await browserSession.clearCache();
     await browserSession.clearAuthCache();
+    console.info(`[DIAG-SIGNOUT] at=${Date.now()} +${Date.now() - t0}ms after caches authCookies=${await count()}`);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    console.info(`[DIAG-SIGNOUT] at=${Date.now()} +${Date.now() - t0}ms after 300ms authCookies=${await count()}`);
+    browserSession.cookies.removeListener('changed', diag);
 
     if ((await browserSession.cookies.get(TWITCH_AUTH_COOKIE)).length > 0) {
       throw new Error('Twitch sign-in for PCG and video could not be cleared.');

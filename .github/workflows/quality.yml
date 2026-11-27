@@ -105,6 +105,11 @@ jobs:
           npm run test:e2e 2>&1 | Tee-Object -FilePath .test-build/electron-e2e/ci-logs/removal-restart.log
           exit $LASTEXITCODE
 
+      - name: DIAG print sign-out lines
+        if: ${{ always() }}
+        run: |
+          Get-ChildItem -Recurse .test-build/electron-e2e -Filter '*-electron.log' | ForEach-Object { Select-String -Path $_.FullName -Pattern 'DIAG-SIGNOUT|tmc-pcg|bootstrap cookie' }
+
       - name: Retain scoped E2E diagnostics
         if: ${{ always() }}
         timeout-minutes: 5

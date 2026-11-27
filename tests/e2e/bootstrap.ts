@@ -259,7 +259,9 @@ void app.whenReady().then(async () => {
           : cookies.set({ url: 'https://www.twitch.tv', name: 'auth-token',
             value: `synthetic-browser-session-${profileId}`, secure: true, httpOnly: true,
             expirationDate: Math.floor(Date.now() / 1000) + 3600 });
+        console.info(`[DIAG-SIGNOUT] at=${Date.now()} bootstrap cookie ${requested} start`);
         void operation.then(() => {
+          console.info(`[DIAG-SIGNOUT] at=${Date.now()} bootstrap cookie ${requested} done`);
           cookieCommand = requested;
           cookieCommandPending = false;
           fs.writeFileSync(path.join(root, 'pcg-cookie-ack'), requested);
