@@ -19,6 +19,7 @@ import { exerciseTimestamps } from './timestamps.mjs';
 import { exerciseBadges } from './badges.mjs';
 import { exerciseSearch } from './search.mjs';
 import { exerciseChatRowCap } from './chat-cap.mjs';
+import { exerciseMemory } from './memory.mjs';
 import { exercisePlayer } from './player.mjs';
 import { appVersionPlugin } from '../../build/appVersion.mjs';
 import { observeDriverTraffic, provenance, verifyDriver } from './driver.mjs';
@@ -81,6 +82,20 @@ async function readNativeViews() {
   const snapshots = (await fs.readdir(root)).filter((name) => /^first-pcg-bounds-\d+\.json$/.test(name));
   snapshots.sort((a, b) => Number(a.match(/(\d+)\.json$/)[1]) - Number(b.match(/(\d+)\.json$/)[1]));
   return snapshots.length ? JSON.parse(await fs.readFile(path.join(root, snapshots.at(-1)), 'utf8')) : [];
+}
+
+let metricsSequence = 0;
+async function readMetrics(request) {
+  const sequence = ++metricsSequence;
+  const command = path.join(root, `first-metrics-${sequence}`);
+  await fs.writeFile(`${command}.tmp`, request, { flag: 'wx' });
+  await fs.rename(`${command}.tmp`, command);
+  const acknowledgement = `${command}.ack.json`;
+  await waitFor(async () => {
+    try { await fs.access(acknowledgement); return true; }
+    catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+  }, `memory observation ${sequence}`);
+  return JSON.parse(await fs.readFile(acknowledgement, 'utf8'));
 }
 
 async function readPlayback() {
@@ -280,6 +295,7 @@ try {
   await exerciseBadges(browser, fixture, evidence, readNativeViews);
   await exerciseSearch(browser, fixture, evidence, readNativeViews);
   await exerciseChatRowCap(browser, fixture);
+  await exerciseMemory(browser, evidence, readMetrics, readPlayback);
   await setBrowserSession('present-A');
   await exercisePlayer(browser, fixture, evidence, readNativeViews, readPlayback, resizeOwnedWindow, closeOwnedPlayerWindow);
   const projectLinks = (await fs.readFile(path.join(root, 'project-link-attempts.txt'), 'utf8')).trim().split('\n');

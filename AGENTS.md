@@ -28,7 +28,8 @@ These instructions apply to the entire Electron/TypeScript repository.
   stale completions; never route results or actions to a newly selected identity.
 - Switching accounts must preserve saved authentication, subject to provider
   validity, and keep PCG panels loaded. Do not introduce automatic panel closure,
-  expiry, or eviction on selection. Existing retention gaps are not resolved.
+  expiry, or eviction on selection. Panels are kept one per account and closed
+  when the account is removed; `tests/e2e/memory.mjs` asserts no page is leaked.
 - Keep PCG browser storage isolated per account. Browser and OAuth authentication
   are separate identities. Distinguish transient failures from revoked sessions.
 - Every connection, view, window, timer, and subscription needs ownership and

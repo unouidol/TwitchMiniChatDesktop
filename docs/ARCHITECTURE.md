@@ -126,7 +126,8 @@ The existing scroll owner reveals a result while search keeps keyboard focus;
 incoming matches update the count without navigating or sending messages.
 New history/live rows register incrementally. The index retains at most 10000
 recent rows and two million normalized characters; eviction or oversized input
-is disclosed alongside the indexed-message count, without removing chat rows.
+is disclosed alongside the indexed-message count. Rendered chat rows are capped
+at 1000 per open channel since 1.1.2; pruned rows leave the index too.
 Account/auth/channel/history resets clear the query/index/highlights and close
 the panel; disposal releases all listeners and row references. Ctrl+F does not
 move focus behind an open login dialog. PCG remains a separate native surface.
@@ -547,18 +548,30 @@ with grace periods and capacity limits. Its lifecycle callbacks are not yet
 connected to ownership of the real views. Its status must not be treated as
 proof that an actual panel was retained or disposed.
 
-Product requirement for subsequent lifecycle work: PCG panels must remain loaded
-when switching accounts. Selection must not automatically close, expire, or evict
-a panel. This account-removal change does not implement retention or change PCG
-behavior; the ownership gaps below remain unresolved.
+Product requirement: PCG panels remain loaded when switching accounts. Selection
+must not automatically close, expire, or evict a panel. Since 1.1.2
+`TmcPcgSessionManager` keeps one panel per account (`retainedViews`, keyed by
+partition) and returns to it without reloading when its last successful load is
+the requested URL and the page is still there. Panels are bounded by the number
+of accounts. Account removal closes that account's panel (immediately if kept,
+at the next selection if shown); PCG sign-out closes a kept signed-in panel of
+that account and reloads the shown one.
+
+Up to 1.1.1 a switch detached the previous view and created a new one without
+closing the old: the Windows E2E memory scenario (`tests/e2e/memory.mjs`)
+counted one more live PCG page per switch, surviving a forced main-process GC
+(14 pages before the scenario, 24 after 10 switches). A reduced reproduction had
+not shown the retention, so the first estimate called it unconfirmed; only the
+real application did. The retainer of the abandoned views was not identified;
+the fix keeps and reuses or explicitly closes every view instead.
 
 ## Known gaps to address incrementally
 
 - Restores still run sequentially before window creation. The timeout is ten seconds
   per request, not a global startup deadline; there is no automatic retry in the
   same run. Offline-account/retry and storage repair/recovery UI remain separate work.
-- Real PCG views and hold metadata have separate owners. Replacement detaches
-  the old view without an explicit close in that path; verify and fix disposal.
+- Real PCG views and hold metadata have separate owners. (Disposal on
+  replacement: fixed in 1.1.2, see PCG retention above.)
 - Preload and renderer bridge types duplicate the contract and retain aliases.
   Consolidation must update callers without assuming backend compatibility.
 - `npm test` covers account removal through the actual application composition,
