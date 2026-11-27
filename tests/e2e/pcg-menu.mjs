@@ -83,8 +83,13 @@ export async function exercisePcgMenu(browser, evidence, readNativeViews, setBro
   await browser.waitUntil(() => browser.isAlertOpen(), { timeout: 10000 });
   assert.match(await browser.getAlertText(), /Sign out of Twitch for PCG and video/);
   await browser.acceptAlert();
-  await browser.waitUntil(async () => (await browser.$('.tmc-pcg-panel').getAttribute('data-tmc-pcg-twitch-auth')) === 'signed-out',
-    { timeout: 20000, timeoutMsg: 'PCG sign-out should clear the Twitch web session' });
+  // signed-out is visible as soon as the cookie goes, before storage clearing
+  // and verification finish: changing the synthetic session earlier races it.
+  await browser.waitUntil(async () => ['done', 'failed'].includes(await browser.$('.tmc-pcg-panel').getAttribute('data-tmc-pcg-sign-out')),
+    { timeout: 20000, timeoutMsg: 'PCG sign-out should finish' });
+  assert.equal(await browser.$('.tmc-pcg-panel').getAttribute('data-tmc-pcg-sign-out'), 'done',
+    `PCG sign-out failed: ${await browser.$('#chatList').getText()}`);
+  assert.equal(await browser.$('.tmc-pcg-panel').getAttribute('data-tmc-pcg-twitch-auth'), 'signed-out');
   await quickLogin.waitForDisplayed();
   assert.deepEqual((await readNativeViews()).map((view) => view.id), ids, 'Sign-out reloads the retained PCG view');
   await trigger.click();

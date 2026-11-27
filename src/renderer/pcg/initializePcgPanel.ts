@@ -67,7 +67,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     if (signInDescription) signInDescription.textContent = status.twitchAuth === 'unknown'
       ? 'We could not confirm a Twitch session for the game. You can sign in here; chat login is separate.'
       : 'PCG and video share this Twitch sign-in, separate from chat. Use the account selected in chat.';
-    if (quickLoginButton) quickLoginButton.disabled = status.state !== 'active' || loginPending;
+    if (quickLoginButton) quickLoginButton.disabled = status.state !== 'active' || loginPending || logoutPending;
     host?.classList.toggle('tmc-pcg-host-detached', status.displayMode === 'detached');
 
     if (detachedPlaceholder) {
@@ -79,7 +79,7 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     }
 
     if (loginButton) {
-      loginButton.disabled = status.state !== 'active' || loginPending;
+      loginButton.disabled = status.state !== 'active' || loginPending || logoutPending;
     }
   };
 
@@ -217,15 +217,25 @@ export function initializePcgPanel(tmc: TmcRendererPreloadApi): void {
     closeMenu();
     menu?.querySelector('summary')?.focus();
     if (logoutPending || !profileId || !window.confirm(SIGN_OUT_CONFIRM_MESSAGE)) return;
+    // The panel can already read signed-out while storage is still being
+    // cleared (the auth cookie goes first); this marks when sign-out ends.
+    const setSignOutState = (state: 'pending' | 'done' | 'failed'): void => {
+      if (panel) panel.dataset.tmcPcgSignOut = state;
+    };
     logoutPending = true;
     logoutButton.disabled = true;
+    if (loginButton) loginButton.disabled = true;
+    if (quickLoginButton) quickLoginButton.disabled = true;
+    setSignOutState('pending');
 
     try {
       const status = await tmc.pcg.signOutTwitch({ profileId });
       logoutPending = false;
+      setSignOutState('done');
       renderStatus(status);
     } catch (error) {
       logoutPending = false;
+      setSignOutState('failed');
       logoutButton.disabled = false;
       appendLocalMessage('error', getErrorMessage(error));
     }
