@@ -259,9 +259,9 @@ void app.whenReady().then(async () => {
           : cookies.set({ url: 'https://www.twitch.tv', name: 'auth-token',
             value: `synthetic-browser-session-${profileId}`, secure: true, httpOnly: true,
             expirationDate: Math.floor(Date.now() / 1000) + 3600 });
-        fs.appendFileSync(path.join(root, 'diag-cookie.txt'), `at=${Date.now()} bootstrap ${requested} start\n`);
+        ((globalThis as unknown as { __diag?: string[] }).__diag ??= []).push(`at=${Date.now()} bootstrap ${requested} start`);
         void operation.then(() => {
-          fs.appendFileSync(path.join(root, 'diag-cookie.txt'), `at=${Date.now()} bootstrap ${requested} done\n`);
+          ((globalThis as unknown as { __diag?: string[] }).__diag ??= []).push(`at=${Date.now()} bootstrap ${requested} done`);
           cookieCommand = requested;
           cookieCommandPending = false;
           fs.writeFileSync(path.join(root, 'pcg-cookie-ack'), requested);

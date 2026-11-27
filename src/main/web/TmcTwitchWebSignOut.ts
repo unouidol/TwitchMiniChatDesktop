@@ -56,7 +56,7 @@ export class TmcTwitchWebSignOut {
     browserSession.cookies.removeListener('changed', diag);
 
     if ((await browserSession.cookies.get(TWITCH_AUTH_COOKIE)).length > 0) {
-      throw new Error(`Twitch sign-in for PCG and video could not be cleared. DIAG ${diagLines.join(' | ')}`);
+      throw new Error(`Twitch sign-in for PCG and video could not be cleared. DIAG ${diagLines.join(' | ')} || BOOT ${((globalThis as unknown as { __diag?: string[] }).__diag ?? []).join(' | ')}`);
     }
 
     this.pcg.completeTwitchWebSignOut(owner);
