@@ -1,0 +1,112 @@
+name: Publish release
+
+# Publishes a draft staged by "Release build". Publishing creates the tag at the
+# commit the draft was built from, so it runs only behind the protected
+# "release" environment: a maintainer must approve each run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without "v" (e.g. 1.1.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
+jobs:
+  require-approval-gate:
+    # A job that names a missing environment makes GitHub create it without
+    # protection. Fail closed unless "release" exists and requires a reviewer.
+    name: Require protected release environment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - name: Check ref, version and environment protection
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::Publish only from main, not $GITHUB_REF"; exit 1; }
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version must be MAJOR.MINOR.PATCH"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/environments/release" > environment.json || {
+            echo "::error::Environment 'release' could not be read; refusing to publish"; exit 1; }
+          echo "protection rules: $(jq -c '[.protection_rules[]? | {type, reviewers: (.reviewers // [] | length)}]' environment.json)"
+          # GitHub cannot save a required_reviewers rule without a reviewer; the
+          # job token may not see the reviewer list itself, so the rule is the check.
+          rules=$(jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length' environment.json)
+          [ "$rules" -ge 1 ] || { echo "::error::Environment 'release' has no required-reviewers rule; refusing to publish"; exit 1; }
+
+  publish:
+    name: Publish draft release
+    needs: require-approval-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Verify the draft, its commit and its checksums
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          notes="docs/releases/$RELEASE_VERSION-notes.md"
+          [ -s "$notes" ] || { echo "::error::Missing release notes $notes"; exit 1; }
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "::error::Tag $tag already exists; tags are never moved"; exit 1
+          fi
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+            --jq ".[] | select(.draft and .tag_name == \"$tag\")" > draft.json
+          [ "$(jq -s length draft.json)" = 1 ] || { echo "::error::Expected exactly one draft for $tag"; exit 1; }
+          target=$(jq -r .target_commitish draft.json)
+          [[ "$target" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Draft target is not a commit SHA: $target"; exit 1; }
+          # The checkout is shallow, so ask GitHub: a commit on main is never
+          # ahead of main (run 45982230103 refused b7520d9 with merge-base).
+          behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/$target...main" --jq .behind_by)
+          [ "$behind" = 0 ] || { echo "::error::$target is not on main (behind_by=$behind)"; exit 1; }
+          sums_id=$(jq -r '.assets[] | select(.name == "SHA256SUMS.txt") | .id' draft.json)
+          [ -n "$sums_id" ] || { echo "::error::Draft has no SHA256SUMS.txt"; exit 1; }
+          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/$sums_id" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          count=0
+          while read -r sum name; do
+            digest=$(jq -r --arg n "$name" '.assets[] | select(.name == $n) | .digest' draft.json)
+            [ "$digest" = "sha256:$sum" ] || { echo "::error::$name digest $digest does not match $sum"; exit 1; }
+            count=$((count + 1))
+          done < SHA256SUMS.txt
+          [ "$count" = 3 ] || { echo "::error::Expected 3 checksummed assets, found $count"; exit 1; }
+          echo "RELEASE_ID=$(jq -r .id draft.json)" >> "$GITHUB_ENV"
+          echo "RELEASE_TARGET=$target" >> "$GITHUB_ENV"
+
+      - name: Publish with the reviewed notes
+        run: |
+          set -euo pipefail
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            -F "body=@docs/releases/$RELEASE_VERSION-notes.md" \
+            -F draft=false -f make_latest=true --jq '.html_url'
+
+      - name: Verify publication
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          [ "$latest" = "$tag" ] || { echo "::error::Latest release is $latest, expected $tag"; exit 1; }
+          commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+          [ "$commit" = "$RELEASE_TARGET" ] || { echo "::error::$tag points to $commit, expected $RELEASE_TARGET"; exit 1; }
+          echo "Published $tag at $commit"
