@@ -24,6 +24,10 @@
     "email": "federico.silenzi@alice.it"
   },
   "license": "UNLICENSED",
+  "engines": {
+    "node": "24.22.3",
+    "npm": "11.19.1"
+  },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",
     "@electron-forge/maker-deb": "^8.0.1",
