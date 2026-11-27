@@ -1,8 +1,10 @@
-import { app, BrowserWindow, safeStorage, screen, session, shell, WebContentsView } from 'electron';
+import { app, BrowserWindow, safeStorage, screen, session, shell, WebContentsView, webContents } from 'electron';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import v8 from 'node:v8';
+import vm from 'node:vm';
 import { installNetworkGuards } from './network-guards';
 import { registerPlayerShutdown } from '../../src/main/player/registerPlayerShutdown';
 import { buildTwitchWebPartition } from '../../src/main/web/TmcTwitchWebPartition';
@@ -184,6 +186,24 @@ void app.whenReady().then(async () => {
     sandboxed: boolean; sharedWithPcg: boolean; webSessionPresent: boolean }>();
   const probingSecurity = new Set<number>();
   let cookieCommand = '';
+  // Memory observation for the parent runner (test-only): live WebContents by
+  // partition and per-process memory, before and after a forced main-process GC.
+  v8.setFlagsFromString('--expose-gc');
+  const collectGarbage = vm.runInNewContext('gc') as () => void;
+  let metricsCommand = 0;
+  let metricsPending = false;
+  const leakProbes: WebContentsView[] = [];
+  const pcgPartition = (contents: Electron.WebContents): string | null => {
+    const match = (contents.session.storagePath || '').match(/[\\/]Partitions[\\/](tmc-pcg-[^\\/]+)/i);
+    return match ? match[1] : null;
+  };
+  const liveContents = () => webContents.getAllWebContents().filter((contents) => !contents.isDestroyed()).map((contents) => {
+    let host = '';
+    try { host = new URL(contents.getURL()).host; } catch { host = ''; }
+    return { id: contents.id, type: contents.getType(), partition: pcgPartition(contents), host };
+  });
+  const processMetrics = () => app.getAppMetrics().map((metric) => ({ type: metric.type, pid: metric.pid,
+    workingSetKB: metric.memory.workingSetSize, privateKB: metric.memory.privateBytes ?? null }));
   let cookieCommandPending = false;
   const boundsObservation = setInterval(() => {
     const source = services.player.source;
@@ -244,6 +264,32 @@ void app.whenReady().then(async () => {
       assert.equal(children.length, 1);
       children[0].close();
       fs.writeFileSync(closePlayerAck, 'closed');
+    }
+    const metricsPath = path.join(root, `${phase}-metrics-${metricsCommand + 1}`);
+    if (!metricsPending && fs.existsSync(metricsPath)) {
+      metricsPending = true;
+      const sequence = ++metricsCommand;
+      const request = fs.readFileSync(metricsPath, 'utf8');
+      assert.ok(['measure', 'leak-probe-create', 'leak-probe-release'].includes(request));
+      if (request === 'leak-probe-create') {
+        // Qualification: a retained, unattached view on a PCG partition must be counted.
+        const probe = new WebContentsView({ webPreferences: { partition: buildTwitchWebPartition('B'), sandbox: true } });
+        leakProbes.push(probe);
+        void probe.webContents.loadURL('about:blank');
+      }
+      if (request === 'leak-probe-release') for (const probe of leakProbes.splice(0)) probe.webContents.close();
+      void (async () => {
+        const beforeGc = liveContents();
+        for (let pass = 0; pass < 3; pass += 1) {
+          collectGarbage();
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        const report = JSON.stringify({ request, beforeGc, afterGc: liveContents(), processes: processMetrics(),
+          mainHeapKB: Math.round(process.memoryUsage().heapUsed / 1024) });
+        const destination = path.join(root, `${phase}-metrics-${sequence}.ack.json`);
+        fs.writeFileSync(`${destination}.tmp`, report);
+        fs.renameSync(`${destination}.tmp`, destination);
+      })().catch(() => fail('Memory observation failed')).finally(() => { metricsPending = false; });
     }
     // Parent-runner control of synthetic cookie storage, never production IPC.
     const commandPath = path.join(root, 'pcg-cookie-command');
