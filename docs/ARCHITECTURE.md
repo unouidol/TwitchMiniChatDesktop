@@ -285,6 +285,26 @@ automatic retries. Detached message nodes do not insert late error UI. The main
 local window denies renderer popups and navigation; PCG windows retain their
 separate existing ownership/navigation policies.
 
+PCG and Twitch pages (panel, separate PCG window, child windows, sign-in popup)
+keep non-Twitch navigation and `window.open` out of TMC. Until 1.1.1 they opened
+any such https URL in the system browser immediately: Electron 43 reports no user
+gesture for `window.open` or navigation (only DownloadItem has `hasUserGesture()`),
+so a page or extension could open browser tabs unasked. `TmcExternalLinkGate`
+now asks first ("Open <host> in your browser?", Cancel by default) and holds one
+prompt at a time, dropping requests that arrive meanwhile instead of queuing them.
+Server-side redirects of a PCG/Twitch main frame to a non-Twitch host are blocked
+by `will-redirect` (which `will-navigate` does not see) and go through the same
+prompt; subframe redirects are left alone because Twitch pages embed third-party
+frames.
+
+Every IPC invoke handler accepts only the local main frame (`assertLocalRenderer`
+or an equivalent check) before reading its payload. Until 1.1.1, 20 handlers
+(account list/select, auth, chat connect/disconnect/status, PCG view
+control and legacy session hold, app ping)
+had no sender check. `tests/ipc-sender-validation.test.cjs` registers the full
+handler set and calls each one from a remote WebContents, a subframe and a main
+window showing another URL, so a handler added without the check fails CI.
+
 `TmcEmoteCatalogService` is the single main-process catalog/cache owner. On picker
 request it validates the active OAuth token to obtain the matching client/user
 and scopes, then requests Twitch global/channel/paginated user emotes. No token

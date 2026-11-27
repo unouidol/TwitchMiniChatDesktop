@@ -53,6 +53,7 @@ export function registerChatIpcHandlers(
       event: IpcMainInvokeEvent,
       request: TmcConnectLiveChatRequest,
     ): Promise<TmcChatLiveStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
 
       const session = accountRegistry.getActiveSession();
@@ -74,6 +75,7 @@ export function registerChatIpcHandlers(
   ipcMain.handle(
     TMC_IPC_CHANNELS.CHAT_DISCONNECT_LIVE,
     async (event: IpcMainInvokeEvent): Promise<TmcChatLiveStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
       ircClient.disconnect();
 
@@ -125,6 +127,7 @@ export function registerChatIpcHandlers(
   ipcMain.handle(
     TMC_IPC_CHANNELS.CHAT_GET_STATUS,
     async (event: IpcMainInvokeEvent): Promise<TmcChatLiveStatus> => {
+      assertLocalRenderer(event);
       rendererSender = event.sender;
 
       return ircClient.getStatus();

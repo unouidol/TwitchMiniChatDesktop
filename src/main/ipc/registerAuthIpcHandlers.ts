@@ -1,4 +1,5 @@
-﻿import { ipcMain } from 'electron';
+﻿import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { assertLocalRenderer } from './assertLocalRenderer';
 
 import type {
   FinalizeTwitchLoginRequest,
@@ -27,17 +28,20 @@ export function registerAuthIpcHandlers(
     authSessionStore,
   );
 
-  ipcMain.handle(TMC_IPC_CHANNELS.AUTH_GET_STATUS, async () => {
+  ipcMain.handle(TMC_IPC_CHANNELS.AUTH_GET_STATUS, async (event: IpcMainInvokeEvent) => {
+    assertLocalRenderer(event);
     return authBrokerClient.getStatus();
   });
 
-  ipcMain.handle(TMC_IPC_CHANNELS.AUTH_GET_SESSION, async () => {
+  ipcMain.handle(TMC_IPC_CHANNELS.AUTH_GET_SESSION, async (event: IpcMainInvokeEvent) => {
+    assertLocalRenderer(event);
     return authBrokerClient.getStatus();
   });
 
   ipcMain.handle(
     TMC_IPC_CHANNELS.AUTH_OPEN_TWITCH_LOGIN,
-    async (_event, request: StartTwitchLoginRequest | undefined) => {
+    async (event, request: StartTwitchLoginRequest | undefined) => {
+      assertLocalRenderer(event);
       return authBrokerClient.startTwitchLogin(
         normalizeStartTwitchLoginRequest(request),
       );
@@ -47,9 +51,10 @@ export function registerAuthIpcHandlers(
   ipcMain.handle(
     TMC_IPC_CHANNELS.AUTH_FINALIZE_TWITCH_LOGIN,
     async (
-      _event,
+      event,
       request: FinalizeTwitchLoginRequest | string | undefined,
     ): Promise<FinalizeTwitchLoginResult> => {
+      assertLocalRenderer(event);
       const loginToken = readLoginTokenFromFinalizeRequest(request);
 
       const session = await authBrokerClient.finalizeLoginToken(loginToken);

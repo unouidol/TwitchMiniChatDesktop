@@ -1,4 +1,5 @@
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { assertLocalRenderer } from './assertLocalRenderer';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import { TmcAccountSessionRegistry } from '../accounts/TmcAccountSessionRegistry';
 import { TmcAccountStore } from '../accounts/TmcAccountStore';
@@ -74,7 +75,8 @@ export async function registerIpcHandlers(
   await accountRegistry.ensureActiveAccount();
   syncAuthSessionStore(authSessionStore, accountRegistry);
 
-  ipcMain.handle(TMC_IPC_CHANNELS.appPing, async () => {
+  ipcMain.handle(TMC_IPC_CHANNELS.appPing, async (event: IpcMainInvokeEvent) => {
+    assertLocalRenderer(event);
     return 'pong';
   });
 
