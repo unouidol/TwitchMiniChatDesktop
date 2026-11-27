@@ -108,7 +108,7 @@ jobs:
       - name: DIAG print sign-out lines
         if: ${{ always() }}
         run: |
-          Get-ChildItem -Recurse .test-build/electron-e2e -Filter '*-electron.log' | ForEach-Object { Select-String -Path $_.FullName -Pattern 'DIAG-SIGNOUT|tmc-pcg|bootstrap cookie' }
+          Get-ChildItem -Recurse $env:TEMP -Filter 'diag-cookie.txt' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName }
 
       - name: Retain scoped E2E diagnostics
         if: ${{ always() }}
