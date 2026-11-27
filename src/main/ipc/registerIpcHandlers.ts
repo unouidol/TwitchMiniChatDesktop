@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import type { TmcRuntimeConfig } from '../config/TmcRuntimeConfig';
 import { TmcAccountSessionRegistry } from '../accounts/TmcAccountSessionRegistry';
 import { TmcAccountStore } from '../accounts/TmcAccountStore';
@@ -35,6 +35,7 @@ import { JsonFileStore } from '../storage/JsonFileStore';
 import { registerWelcomeIpcHandlers } from './registerWelcomeIpcHandlers';
 import path from 'node:path';
 import { TmcTwitchWebSessions } from '../web/TmcTwitchWebSessions';
+import { broadcastToWindows } from '../windows/broadcastToWindows';
 
 /**
  * Registers application-level Inter-Process Communication handlers.
@@ -58,11 +59,7 @@ export async function registerIpcHandlers(
   const webSessions = new TmcTwitchWebSessions(() => accountRegistry.listAccounts().accounts.map((account) => account.profileId));
   const pcgSessionHoldManager = new TmcPcgSessionHoldManager();
   const pcgSessionManager = new TmcPcgSessionManager(runtimeConfig, (status) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send(TMC_IPC_CHANNELS.PCG_STATUS_CHANGED, status);
-      }
-    }
+    broadcastToWindows(TMC_IPC_CHANNELS.PCG_STATUS_CHANGED, status);
   }, webSessions);
 
   await accountRegistry.initialize();
@@ -113,7 +110,7 @@ export async function registerIpcHandlers(
   registerSettingsIpcHandlers();
   registerBackendIpcHandlers(runtimeConfig, authSessionStore, accountRegistry);
   const player = new TmcPlayerManager(() => accountRegistry.getActiveSession()?.profileId || null, (status) => {
-    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(TMC_IPC_CHANNELS.PLAYER_CHANGED, status);
+    broadcastToWindows(TMC_IPC_CHANNELS.PLAYER_CHANGED, status);
   }, webSessions);
   registerPlayerIpcHandlers(player);
   return { player };
