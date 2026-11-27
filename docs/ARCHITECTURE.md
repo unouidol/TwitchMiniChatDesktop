@@ -412,7 +412,10 @@ and only the profile both shown by PCG and selected as active, so a stale click
 cannot sign out another account. `TmcTwitchWebSignOut` closes that account's
 video, destroys windows on its web Session (sign-in popup, separate PCG window),
 clears storage, cache and HTTP auth, then requires the auth-token cookie to be
-absent before PCG reports signed-out and reloads the retained view. Chat OAuth is
+absent before PCG reports signed-out and reloads the retained view. The panel
+can read signed-out earlier (the cookie goes first), so `data-tmc-pcg-sign-out`
+(pending/done/failed) marks completion, and sign-in stays disabled meanwhile. The
+first E2E step treated signed-out as completion and raced its own fixture. Chat OAuth is
 untouched. Up to 1.1.0 there was no PCG sign-out, and removing an account left
 its web storage signed in.
 Presence is not a live Twitch validity check, account-name verification or PCG
