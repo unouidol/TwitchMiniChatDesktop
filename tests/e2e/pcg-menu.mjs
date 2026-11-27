@@ -7,6 +7,7 @@ export async function exercisePcgMenu(browser, evidence, readNativeViews, setBro
   const trigger = await browser.$('[data-tmc-pcg-menu] summary');
   const login = await browser.$('[data-tmc-pcg-login]');
   const detach = await browser.$('[data-tmc-pcg-detach]');
+  const logout = await browser.$('[data-tmc-pcg-logout]');
   const status = await browser.$('[data-tmc-pcg-status]');
   const visible = async () => {
     await browser.waitUntil(async () => (await readNativeViews()).some((view) => view.bounds.width > 20));
@@ -74,6 +75,27 @@ export async function exercisePcgMenu(browser, evidence, readNativeViews, setBro
   await quickLogin.waitForDisplayed({ reverse: true });
   assert.equal(await browser.$('.tmc-pcg-panel').getAttribute('data-tmc-pcg-twitch-auth'), 'session-present');
   assert.deepEqual((await readNativeViews()).map((view) => view.id), ids);
+
+  // Real Electron storage: sign-out must clear the shared Twitch web session.
+  await trigger.click();
+  await logout.waitForDisplayed();
+  await logout.click();
+  await browser.waitUntil(() => browser.isAlertOpen(), { timeout: 10000 });
+  assert.match(await browser.getAlertText(), /Sign out of Twitch for PCG and video/);
+  await browser.acceptAlert();
+  await browser.waitUntil(async () => (await browser.$('.tmc-pcg-panel').getAttribute('data-tmc-pcg-twitch-auth')) === 'signed-out',
+    { timeout: 20000, timeoutMsg: 'PCG sign-out should clear the Twitch web session' });
+  await quickLogin.waitForDisplayed();
+  assert.deepEqual((await readNativeViews()).map((view) => view.id), ids, 'Sign-out reloads the retained PCG view');
+  await trigger.click();
+  await login.waitForDisplayed();
+  assert.equal(await logout.isDisplayed(), false, 'Sign-out is offered only while signed in');
+  await browser.keys('Escape');
+  // The fixture caches its last command; step through "missing" to restore B.
+  await setBrowserSession('missing');
+  await setBrowserSession('present');
+  await quickLogin.waitForDisplayed({ reverse: true });
+
   await browser.execute("document.querySelector('#pcgHost').style.cssText = ''");
   await visible();
   await browser.saveScreenshot(path.join(evidence, 'pcg-layout.png'));

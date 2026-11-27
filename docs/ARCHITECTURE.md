@@ -405,6 +405,16 @@ loads before publishing status for a different account.
 An active panel without confirmed session evidence shows an explicit game-login
 prompt above its host. With a session present, that prompt is hidden and sign-in
 remains in PCG options. Both actions use the same existing popup operation.
+
+With a session present, PCG options also offer "Sign out of PCG and video…"
+(confirmation required). `PCG_SIGN_OUT_TWITCH` accepts only the local main frame
+and only the profile both shown by PCG and selected as active, so a stale click
+cannot sign out another account. `TmcTwitchWebSignOut` closes that account's
+video, destroys windows on its web Session (sign-in popup, separate PCG window),
+clears storage, cache and HTTP auth, then requires the auth-token cookie to be
+absent before PCG reports signed-out and reloads the retained view. Chat OAuth is
+untouched. Up to 1.1.0 there was no PCG sign-out, and removing an account left
+its web storage signed in.
 Presence is not a live Twitch validity check, account-name verification or PCG
 extension authorization. Any extension-specific consent remains in its own UI.
 
@@ -446,6 +456,10 @@ the removed session's token and is best effort: failure does not undo local
 removal. Logout and each session-restore request have a ten-second HTTP timeout,
 including response-body consumption.
 A late logout completion does not change the subsequently selected account.
+After the encrypted deletion and before the registry change, removal also signs
+the account out of its Twitch web storage (`TmcTwitchWebSignOut`, below), so a
+removed account does not leave PCG and video signed in. Failure there is logged
+and does not undo removal.
 Save/delete operations on the application's secure-store instance are serialized
 to avoid overlapping read-modify-write operations restoring removed credentials.
 

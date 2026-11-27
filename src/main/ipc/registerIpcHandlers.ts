@@ -36,6 +36,7 @@ import { registerWelcomeIpcHandlers } from './registerWelcomeIpcHandlers';
 import path from 'node:path';
 import { TmcTwitchWebSessions } from '../web/TmcTwitchWebSessions';
 import { broadcastToWindows } from '../windows/broadcastToWindows';
+import { TmcTwitchWebSignOut } from '../web/TmcTwitchWebSignOut';
 
 /**
  * Registers application-level Inter-Process Communication handlers.
@@ -89,10 +90,15 @@ export async function registerIpcHandlers(
     attention: chatAttention({ ...message, author: message.username }, accountRegistry.getActiveSession()),
   }),
     (profileId, message) => emoteCatalog.recordSent(profileId, message));
+  const player = new TmcPlayerManager(() => accountRegistry.getActiveSession()?.profileId || null, (status) => {
+    broadcastToWindows(TMC_IPC_CHANNELS.PLAYER_CHANGED, status);
+  }, webSessions);
+  const twitchWebSignOut = new TmcTwitchWebSignOut(webSessions, pcgSessionManager, player);
   registerAccountIpcHandlers(accountRegistry, authSessionStore, {
     runtimeConfig,
     secureAuthSessionStore,
     chatController,
+    twitchWebSignOut,
   });
   registerAccountChannelIpcHandlers(accountRegistry, accountChannelStore);
   registerAuthIpcHandlers(
@@ -106,12 +112,10 @@ export async function registerIpcHandlers(
     pcgSessionHoldManager,
     accountRegistry,
     accountChannelStore,
+    twitchWebSignOut,
   });
   registerSettingsIpcHandlers();
   registerBackendIpcHandlers(runtimeConfig, authSessionStore, accountRegistry);
-  const player = new TmcPlayerManager(() => accountRegistry.getActiveSession()?.profileId || null, (status) => {
-    broadcastToWindows(TMC_IPC_CHANNELS.PLAYER_CHANGED, status);
-  }, webSessions);
   registerPlayerIpcHandlers(player);
   return { player };
 }

@@ -183,6 +183,7 @@ export type TmcRendererPreloadApi = {
     readonly hideView: () => Promise<TmcPcgStatus>;
     readonly openTwitchLogin: () => Promise<TmcPcgStatus>;
     readonly openDetachedWindow: () => Promise<TmcPcgStatus>;
+    readonly signOutTwitch: (request: { readonly profileId: string }) => Promise<TmcPcgStatus>;
     readonly onStatusChanged: (
       callback: (status: TmcPcgStatus) => void,
     ) => () => void;

@@ -410,6 +410,7 @@ button:focus-visible, summary:focus-visible, select:focus-visible {
 .tmc-live-toggle[data-state="open"]:hover { background: #4338ca; }
 .tmc-live-toggle-icon { display: flex; align-items: center; justify-content: center; }
 .tmc-live-toggle-icon[hidden] { display: none; }
+.tmc-pcg-logout-button[hidden] { display: none; }
 .tmc-live-toggle-icon svg { display: block; width: 18px; height: 18px; }
 .tmc-live-player { flex: 0 0 auto; background: #101827; border-bottom: 1px solid #334155; }
 .tmc-live-player[hidden], .tmc-live-player-host[hidden], .tmc-live-player-sizing[hidden] { display: none; }
