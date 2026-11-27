@@ -37,11 +37,13 @@ jobs:
           set -euo pipefail
           [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::Publish only from main, not $GITHUB_REF"; exit 1; }
           [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version must be MAJOR.MINOR.PATCH"; exit 1; }
-          reviewers=$(gh api "repos/$GITHUB_REPOSITORY/environments/release" \
-            --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length') || {
+          gh api "repos/$GITHUB_REPOSITORY/environments/release" > environment.json || {
             echo "::error::Environment 'release' could not be read; refusing to publish"; exit 1; }
-          [ "$reviewers" -ge 1 ] || { echo "::error::Environment 'release' has no required reviewer; refusing to publish"; exit 1; }
-          echo "release environment requires $reviewers reviewer(s)"
+          echo "protection rules: $(jq -c '[.protection_rules[]? | {type, reviewers: (.reviewers // [] | length)}]' environment.json)"
+          # GitHub cannot save a required_reviewers rule without a reviewer; the
+          # job token may not see the reviewer list itself, so the rule is the check.
+          rules=$(jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length' environment.json)
+          [ "$rules" -ge 1 ] || { echo "::error::Environment 'release' has no required-reviewers rule; refusing to publish"; exit 1; }
 
   publish:
     name: Publish draft release
