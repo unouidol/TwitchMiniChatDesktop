@@ -24,6 +24,12 @@ const archive = path.join(path.dirname(binary), 'resources', 'app.asar');
 const files = asar.listPackage(archive).map((entry) => entry.replaceAll('\\', '/'));
 assert.ok(files.every((entry) => entry === '/package.json' || entry === '/.vite' || entry.startsWith('/.vite/')), 'Only production bundles and package metadata may ship');
 const metadata = JSON.parse(asar.extractFile(archive, 'package.json').toString());
+// Electron and Chromium license notices must ship next to the binary (the app
+// bundles no third-party npm runtime code; checked 2026-11-27).
+for (const notice of ['LICENSE', 'LICENSES.chromium.html']) {
+  const stat = await fs.stat(path.join(path.dirname(binary), notice));
+  assert.ok(stat.isFile() && stat.size > 0, `Package must include ${notice}`);
+}
 const fuses = await getCurrentFuseWire(binary);
 for (const [name, expected] of Object.entries({ RunAsNode: 0, EnableCookieEncryption: 1, EnableNodeOptionsEnvironmentVariable: 0,
   EnableNodeCliInspectArguments: 0, EnableEmbeddedAsarIntegrityValidation: 1, OnlyLoadAppFromAsar: 1 })) {

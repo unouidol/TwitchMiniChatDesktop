@@ -1,0 +1,23 @@
+# Weekly update PRs. They run the same Windows quality and E2E checks as any
+# other PR and are merged only when those pass.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Minor and patch updates together; each major (e.g. Electron) stays its
+      # own PR so its breaking changes get their own review.
+      minor-and-patch:
+        update-types: [minor, patch]
